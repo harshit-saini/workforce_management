@@ -1,0 +1,503 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  ONGOING
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum NotificationType {
+  TASK_DUE_SOON
+  TASK_OVERDUE
+  NO_TIME_LOGGED
+  WEEKLY_REPORT_DUE
+  MONTHLY_REPORT_PENDING
+  TASK_ASSIGNED
+  COMMENT_MENTION
+  MANUAL_NUDGE
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum TaskActivityType {
+  CREATED
+  EDITED
+  REASSIGNED
+  STATUS_CHANGE
+  COMMENT
+  ATTACHMENT_ADDED
+  SUBTASK_ADDED
+  TIME_LOGGED
+}
+
+enum AuditAction {
+  ROLE_CHANGED
+  MANAGER_REASSIGNED
+  TASK_REASSIGNED
+  USER_DEACTIVATED
+  USER_REACTIVATED
+  USER_REMOVED
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Core tenancy / identity
+// ─────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  centers       Center[]
+  departments   Department[]
+  invites       Invite[]
+  tasks         Task[]
+  notifications Notification[]
+  weeklyReports WeeklyReport[]
+  monthlyReports MonthlyReport[]
+  auditLogs     AuditLog[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  centerId String?
+  center   Center? @relation(fields: [centerId], references: [id])
+
+  email        String @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  title        String?
+  department   Department? @relation("DepartmentMembers", fields: [departmentId], references: [id])
+  departmentId String?
+
+  role   Role       @default(EMPLOYEE)
+  status UserStatus @default(ACTIVE)
+
+  isCenterHead Boolean @default(false)
+
+  managerId String?
+  manager   User?   @relation("ReportsTo", fields: [managerId], references: [id])
+  reports   User[]  @relation("ReportsTo")
+
+  startDate DateTime?
+  deletedAt DateTime?
+
+  totpSecret  String?
+  totpEnabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens        RefreshToken[]
+  createdTasks         Task[]                 @relation("TaskCreatedBy")
+  assignedTasks        Task[]                 @relation("TaskAssignee")
+  watchedTasks         TaskWatcher[]
+  taskLogs             TaskLog[]
+  taskComments         TaskComment[]
+  taskActivities       TaskActivity[]
+  uploadedAttachments  TaskAttachment[]
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
+  weeklyReports        WeeklyReport[]         @relation("WeeklyReportOwner")
+  reviewedWeeklyReports WeeklyReport[]        @relation("WeeklyReportReviewer")
+  monthlyReports        MonthlyReport[]
+  headOfDepartments     Department[]          @relation("DepartmentHead")
+  auditLogsActedBy      AuditLog[]            @relation("AuditActor")
+  auditLogsTargeting    AuditLog[]            @relation("AuditTarget")
+
+  @@index([organizationId, managerId])
+  @@index([organizationId, centerId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  email        String
+  role         Role     @default(EMPLOYEE)
+  centerId     String?
+  departmentId String?
+  managerId    String?
+  title        String?
+
+  token     String   @unique
+  expiresAt DateTime
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, email])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Centers & Departments
+// ─────────────────────────────────────────────────────────────────────────
+
+model Center {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  name     String
+  code     String
+  address  String?
+  timezone String  @default("UTC")
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+  tasks Task[]
+
+  @@unique([organizationId, code])
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  name       String
+  headUserId String?
+  head       User?   @relation("DepartmentHead", fields: [headUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members User[] @relation("DepartmentMembers")
+  tasks   Task[]
+
+  @@unique([organizationId, name])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tasks
+// ─────────────────────────────────────────────────────────────────────────
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  centerId     String?
+  center       Center?     @relation(fields: [centerId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  title       String
+  description String?
+  status      TaskStatus   @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  isRecurring Boolean      @default(false)
+
+  tags TaskTag[]
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  parentTaskId String?
+  parentTask   Task?   @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]  @relation("Subtasks")
+
+  dueDate        DateTime?
+  estimatedHours Float?
+
+  blockedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+
+  watchers    TaskWatcher[]
+  logs        TaskLog[]
+  comments    TaskComment[]
+  activities  TaskActivity[]
+  attachments TaskAttachment[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, assigneeId])
+  @@index([organizationId, centerId])
+  @@index([parentTaskId])
+}
+
+model TaskTag {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label  String
+
+  @@index([taskId])
+}
+
+model TaskWatcher {
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([taskId, userId])
+}
+
+model TaskLog {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  date        DateTime
+  hoursLogged Float
+  note        String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId, date])
+  @@index([userId, date])
+}
+
+model TaskComment {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  comment         String
+  statusChangedTo TaskStatus?
+
+  createdAt DateTime @default(now())
+
+  attachments TaskAttachment[]
+
+  @@index([taskId, createdAt])
+}
+
+model TaskActivity {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type    TaskActivityType
+  message String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model TaskAttachment {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   TaskComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  fileName     String
+  fileUrl      String
+  fileType     String
+  fileSizeBytes Int
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type            NotificationType
+  relatedTaskId   String?
+  relatedReportId String?
+  message         String
+  isRead          Boolean             @default(false)
+  channel         NotificationChannel @default(IN_APP)
+  dedupeKey       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, userId, isRead])
+  @@index([dedupeKey])
+}
+
+model NotificationPreference {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type        NotificationType
+  inAppEnabled Boolean @default(true)
+  emailEnabled Boolean @default(true)
+
+  @@unique([userId, type])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Reports
+// ─────────────────────────────────────────────────────────────────────────
+
+model WeeklyReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  userId String
+  user   User   @relation("WeeklyReportOwner", fields: [userId], references: [id])
+
+  weekStartDate DateTime
+  weekEndDate   DateTime
+
+  tasksCompleted  Int   @default(0)
+  tasksCarriedOver Int  @default(0)
+  tasksBlocked    Int   @default(0)
+  hoursLogged     Float @default(0)
+  daysLogged      Int   @default(0)
+
+  summary String?
+  status  ReportStatus @default(DRAFT)
+
+  managerComment String?
+  reviewerId     String?
+  reviewer       User?    @relation("WeeklyReportReviewer", fields: [reviewerId], references: [id])
+
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekStartDate])
+  @@index([organizationId, weekStartDate])
+}
+
+model MonthlyReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  month Int
+  year  Int
+
+  tasksPlanned   Int   @default(0)
+  tasksCompleted Int   @default(0)
+  completionRate Float @default(0)
+
+  hoursLogged   Float @default(0)
+  daysLogged    Int   @default(0)
+  hoursExpected Float @default(0)
+
+  weeklyBreakdownJson Json?
+  topBlockersJson     Json?
+
+  generatedAt DateTime @default(now())
+
+  @@unique([userId, year, month])
+  @@index([organizationId, year, month])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  action   AuditAction
+  actorId  String
+  actor    User        @relation("AuditActor", fields: [actorId], references: [id])
+  targetUserId String?
+  target       User?   @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  metadata Json?
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
