@@ -9,3 +9,4 @@ backend/uploads/
 backend/prisma/dev.db
 coverage/
 .vite/
+*.tsbuildinfo
