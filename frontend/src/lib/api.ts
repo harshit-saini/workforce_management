@@ -1,6 +1,8 @@
 import axios from "axios";
 
-export const api = axios.create({ baseURL: "/api" });
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+
+export const api = axios.create({ baseURL: API_BASE_URL });
 
 let accessToken: string | null = localStorage.getItem("accessToken");
 let refreshToken: string | null = localStorage.getItem("refreshToken");
@@ -34,7 +36,7 @@ let refreshPromise: Promise<string | null> | null = null;
 async function performRefresh(): Promise<string | null> {
   if (!refreshToken) return null;
   try {
-    const { data } = await axios.post("/api/auth/refresh", { refreshToken });
+    const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
     setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
     return data.accessToken;
   } catch {
