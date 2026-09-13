@@ -100,7 +100,7 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30">
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
         <h2 className="text-base font-semibold mb-4">Add center</h2>
         <form onSubmit={onSubmit}>

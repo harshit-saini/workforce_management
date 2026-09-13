@@ -40,7 +40,7 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-20">
           <div className="p-3 border-b border-gray-100 font-medium text-sm">Notifications</div>
           <div className="max-h-80 overflow-y-auto">
             {data?.items.length ? (

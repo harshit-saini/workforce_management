@@ -72,7 +72,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-6">
+      <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
           ✕
         </button>
