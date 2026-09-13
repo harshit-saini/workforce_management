@@ -60,7 +60,7 @@ export async function listTasks(
       : {}),
     ...(query.view === "backlog" ? { status: "BACKLOG" } : {}),
     ...(query.view === "ongoing" ? { isRecurring: true } : {}),
-    ...(query.view === "board" ? { isRecurring: false, status: { not: "BACKLOG" } } : {}),
+    ...(query.view === "board" ? { isRecurring: false } : {}),
   };
 
   const [items, total] = await Promise.all([
