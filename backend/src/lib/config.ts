@@ -19,7 +19,13 @@ export const config = {
   },
   uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB ?? 10),
-  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  // Comma-separated list of allowed frontend origins. Trailing slashes and
+  // whitespace are stripped since browsers send Origin without a trailing
+  // slash and a mismatch there silently breaks CORS matching.
+  corsOrigins: (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean),
   cron: {
     reminderScan: process.env.REMINDER_SCAN_CRON ?? "0 * * * *",
     weeklyReportDeadline: process.env.WEEKLY_REPORT_DEADLINE_CRON ?? "0 12 * * 1",

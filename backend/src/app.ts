@@ -20,7 +20,8 @@ import reportsRoutes from "./modules/reports/reports.routes.js";
 export function buildApp() {
   const app = Fastify({ logger: true });
 
-  app.register(cors, { origin: config.corsOrigin, credentials: true });
+  app.log.info({ allowedOrigins: config.corsOrigins }, "CORS configured");
+  app.register(cors, { origin: config.corsOrigins, credentials: true });
   app.register(multipart, { limits: { fileSize: config.maxUploadMb * 1024 * 1024 } });
   app.register(fastifyStatic, { root: path.resolve(config.uploadDir), prefix: "/uploads/" });
   app.register(authPlugin);
