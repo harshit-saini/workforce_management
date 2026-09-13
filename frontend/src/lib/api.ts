@@ -23,6 +23,18 @@ export function getAccessToken() {
   return accessToken;
 }
 
+/**
+ * Attachment/upload URLs come back as paths relative to the backend's root
+ * (e.g. "/uploads/xyz.png"), served outside the "/api" prefix. Resolve them
+ * against the backend's origin so they load correctly when the frontend and
+ * backend are deployed to different hosts.
+ */
+export function resolveFileUrl(relativeUrl: string): string {
+  if (/^https?:\/\//.test(relativeUrl)) return relativeUrl;
+  const origin = API_BASE_URL.replace(/\/api\/?$/, "");
+  return `${origin}${relativeUrl}`;
+}
+
 api.interceptors.request.use((req) => {
   if (accessToken) {
     req.headers = req.headers ?? {};

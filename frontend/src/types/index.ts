@@ -81,6 +81,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  attachments?: TaskAttachment[];
   _count?: { comments: number; attachments: number };
 }
 
