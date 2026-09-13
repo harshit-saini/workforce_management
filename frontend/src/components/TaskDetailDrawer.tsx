@@ -2,12 +2,38 @@ import { useRef, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
-import { Task, TaskStatus, TaskComment, TaskActivity } from "@/types";
+import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity } from "@/types";
 import TaskFormModal from "@/components/TaskFormModal";
+import AttachmentPreview from "@/components/AttachmentPreview";
+import { useCenters, useDepartments, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
 
 const statusOptions: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "ONGOING", "IN_REVIEW", "BLOCKED", "DONE"];
+
+interface EditForm {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  assigneeId: string;
+  centerId: string;
+  departmentId: string;
+  dueDate: string;
+  estimatedHours: string;
+}
+
+function toEditForm(task: Task): EditForm {
+  return {
+    title: task.title,
+    description: task.description ?? "",
+    priority: task.priority,
+    assigneeId: task.assigneeId ?? "",
+    centerId: task.centerId ?? "",
+    departmentId: task.departmentId ?? "",
+    dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
+    estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : "",
+  };
+}
 
 export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -16,6 +42,8 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const [statusChangedTo, setStatusChangedTo] = useState<TaskStatus | "">("");
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [logHours, setLogHours] = useState("8");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: task } = useQuery({
@@ -27,6 +55,10 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     queryKey: ["task-activity", taskId],
     queryFn: async () => (await api.get<ActivityItem[]>(`/tasks/${taskId}/activity`)).data,
   });
+
+  const { data: users } = useUsersList();
+  const { data: centers } = useCenters();
+  const { data: departments } = useDepartments();
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["task", taskId] });
@@ -61,10 +93,39 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     onSuccess: invalidate,
   });
 
+  const saveEdit = useMutation({
+    mutationFn: (form: EditForm) =>
+      api.patch(`/tasks/${taskId}`, {
+        title: form.title,
+        description: form.description || null,
+        priority: form.priority,
+        assigneeId: form.assigneeId || null,
+        centerId: form.centerId || null,
+        departmentId: form.departmentId || null,
+        dueDate: form.dueDate || null,
+        estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : null,
+      }),
+    onSuccess: () => {
+      setIsEditing(false);
+      invalidate();
+    },
+  });
+
   async function onCommentSubmit(e: FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
     addComment.mutate();
+  }
+
+  function startEditing() {
+    if (!task) return;
+    setEditForm(toEditForm(task));
+    setIsEditing(true);
+  }
+
+  function onEditSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (editForm) saveEdit.mutate(editForm);
   }
 
   if (!task) return null;
@@ -77,14 +138,143 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
           ✕
         </button>
 
-        <h2 className="text-lg font-semibold text-gray-900 pr-8">{task.title}</h2>
-        <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
-          <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.status}</span>
-          <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.priority}</span>
-          {task.assignee && <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.assignee.name}</span>}
-          {task.center && <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.center.name}</span>}
-        </div>
-        {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
+        {!isEditing ? (
+          <>
+            <div className="flex items-start justify-between pr-8 gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">{task.title}</h2>
+              <button
+                onClick={startEditing}
+                className="shrink-0 text-xs text-brand-600 hover:underline whitespace-nowrap mt-1"
+              >
+                Edit
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
+              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.status}</span>
+              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.priority}</span>
+              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.assignee?.name ?? "Unassigned"}</span>
+              {task.center && <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.center.name}</span>}
+              {task.dueDate && (
+                <span className="px-2 py-0.5 rounded-full bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
+              )}
+            </div>
+            {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
+          </>
+        ) : (
+          <form onSubmit={onEditSubmit} className="pr-8">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Edit task</h3>
+            <input
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2 font-medium"
+              value={editForm!.title}
+              onChange={(e) => setEditForm({ ...editForm!, title: e.target.value })}
+              required
+            />
+            <textarea
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
+              rows={3}
+              placeholder="Description"
+              value={editForm!.description}
+              onChange={(e) => setEditForm({ ...editForm!, description: e.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <label className="text-xs text-gray-500">
+                Priority
+                <select
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.priority}
+                  onChange={(e) => setEditForm({ ...editForm!, priority: e.target.value as TaskPriority })}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </label>
+              <label className="text-xs text-gray-500">
+                Assignee
+                <select
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.assigneeId}
+                  onChange={(e) => setEditForm({ ...editForm!, assigneeId: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {users?.items.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-gray-500">
+                Center
+                <select
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.centerId}
+                  onChange={(e) => setEditForm({ ...editForm!, centerId: e.target.value })}
+                >
+                  <option value="">—</option>
+                  {centers?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-gray-500">
+                Department
+                <select
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.departmentId}
+                  onChange={(e) => setEditForm({ ...editForm!, departmentId: e.target.value })}
+                >
+                  <option value="">—</option>
+                  {departments?.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-gray-500">
+                Due date
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.dueDate}
+                  onChange={(e) => setEditForm({ ...editForm!, dueDate: e.target.value })}
+                />
+              </label>
+              <label className="text-xs text-gray-500">
+                Estimated hours
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
+                  value={editForm!.estimatedHours}
+                  onChange={(e) => setEditForm({ ...editForm!, estimatedHours: e.target.value })}
+                />
+              </label>
+            </div>
+            {saveEdit.isError && <p className="text-xs text-red-600 mb-2">Could not save changes.</p>}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saveEdit.isPending}
+                className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700 disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Subtasks */}
         <section className="mt-6">
@@ -196,6 +386,15 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               }}
             />
           </div>
+          {uploadAttachment.isPending && <div className="text-xs text-gray-400 mb-2">Uploading…</div>}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {task.attachments?.map((att) => (
+              <AttachmentPreview key={att.id} attachment={att} />
+            ))}
+          </div>
+          {(!task.attachments || task.attachments.length === 0) && (
+            <div className="text-xs text-gray-400">No files attached</div>
+          )}
         </section>
 
         {/* Activity */}

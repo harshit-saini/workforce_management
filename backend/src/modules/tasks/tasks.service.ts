@@ -17,6 +17,10 @@ const taskInclude = {
     select: { id: true, title: true, status: true, assigneeId: true, dueDate: true },
   },
   parentTask: { select: { id: true, title: true, status: true } },
+  attachments: {
+    where: { commentId: null },
+    orderBy: { createdAt: "desc" },
+  },
   _count: { select: { comments: true, attachments: true } },
 } satisfies Prisma.TaskInclude;
 
