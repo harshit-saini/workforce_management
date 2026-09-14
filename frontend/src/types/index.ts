@@ -1,6 +1,25 @@
 export type Role = "OWNER" | "ADMIN" | "MANAGER" | "EMPLOYEE";
 export type UserStatus = "ACTIVE" | "INACTIVE" | "ON_LEAVE";
-export type TaskStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "ONGOING" | "IN_REVIEW" | "DONE" | "BLOCKED";
+// Organization-defined (Jira-like custom statuses) — see TaskStatusOption / Settings page.
+export type TaskStatus = string;
+export type StatusCategory = "BACKLOG" | "ACTIVE" | "DONE" | "BLOCKED";
+
+export interface TaskStatusOption {
+  id: string;
+  key: string;
+  label: string;
+  category: StatusCategory;
+  color: string;
+  order: number;
+  isDefault: boolean;
+  isRecurringDefault: boolean;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+}
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type ReportStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED";
 export type NotificationType =

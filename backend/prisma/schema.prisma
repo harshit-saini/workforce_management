@@ -25,12 +25,12 @@ enum UserStatus {
   ON_LEAVE
 }
 
-enum TaskStatus {
+// Task.status is a free-form, organization-defined string (see TaskStatusOption)
+// so admins can add/rename/reorder/recolor statuses Jira-style. Every status must
+// map to one of these categories, which is what aggregation/reporting logic keys off.
+enum StatusCategory {
   BACKLOG
-  TODO
-  IN_PROGRESS
-  ONGOING
-  IN_REVIEW
+  ACTIVE
   DONE
   BLOCKED
 }
@@ -96,15 +96,16 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  centers       Center[]
-  departments   Department[]
-  invites       Invite[]
-  tasks         Task[]
-  notifications Notification[]
-  weeklyReports WeeklyReport[]
-  monthlyReports MonthlyReport[]
-  auditLogs     AuditLog[]
+  users             User[]
+  centers           Center[]
+  departments       Department[]
+  invites           Invite[]
+  tasks             Task[]
+  notifications     Notification[]
+  weeklyReports     WeeklyReport[]
+  monthlyReports    MonthlyReport[]
+  auditLogs         AuditLog[]
+  taskStatusOptions TaskStatusOption[]
 }
 
 model User {
@@ -252,7 +253,9 @@ model Task {
 
   title       String
   description String?
-  status      TaskStatus   @default(BACKLOG)
+  // References TaskStatusOption.key within the same organization (kept as a plain
+  // string rather than a enum so orgs can define their own statuses; see below).
+  status      String       @default("BACKLOG")
   priority    TaskPriority @default(MEDIUM)
   isRecurring Boolean      @default(false)
 
@@ -287,6 +290,29 @@ model Task {
   @@index([organizationId, assigneeId])
   @@index([organizationId, centerId])
   @@index([parentTaskId])
+}
+
+// Org-defined task statuses (Jira-style custom workflow). Task.status stores `key`.
+model TaskStatusOption {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  key      String
+  label    String
+  category StatusCategory
+  color    String         @default("#6b7280")
+  order    Int
+  // The status new tasks default to (exactly one per org, category BACKLOG).
+  isDefault Boolean @default(false)
+  // The status used when a task is marked "ongoing/recurring" from the create form.
+  isRecurringDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId, order])
 }
 
 model TaskTag {
@@ -332,7 +358,7 @@ model TaskComment {
   user   User   @relation(fields: [userId], references: [id])
 
   comment         String
-  statusChangedTo TaskStatus?
+  statusChangedTo String?
 
   createdAt DateTime @default(now())
 

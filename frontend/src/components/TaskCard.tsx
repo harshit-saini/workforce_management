@@ -10,21 +10,10 @@ const priorityColor: Record<string, string> = {
   URGENT: "bg-red-100 text-red-700",
 };
 
-export default function TaskCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
-
+/** Pure visual card, no drag hooks — used both by the real draggable card and the DragOverlay preview. */
+export function TaskCardContent({ task }: { task: Task }) {
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={onOpen}
-      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 10 } : undefined}
-      className={clsx(
-        "bg-white rounded-lg border border-gray-100 shadow-sm p-3 mb-2 cursor-pointer hover:border-brand-300",
-        isDragging && "opacity-50"
-      )}
-    >
+    <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-3 mb-2 hover:border-brand-300 hover:shadow-md transition-shadow duration-150">
       <div className="text-sm font-medium text-gray-800 mb-1">{task.title}</div>
       <div className="flex items-center flex-wrap gap-1.5 mb-1">
         <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full font-medium", priorityColor[task.priority])}>
@@ -45,6 +34,22 @@ export default function TaskCard({ task, onOpen }: { task: Task; onOpen: () => v
           {task.subtasks.filter((s) => s.status === "DONE").length}/{task.subtasks.length} subtasks
         </div>
       )}
+    </div>
+  );
+}
+
+export default function TaskCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onOpen}
+      className={clsx("cursor-pointer", isDragging && "opacity-40")}
+    >
+      <TaskCardContent task={task} />
     </div>
   );
 }

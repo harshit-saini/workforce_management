@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 import { dateKey } from "../../lib/dates.js";
+import { getStatusKeysByCategory } from "../../lib/taskStatuses.js";
 
 export interface OverviewScope {
   userIds?: string[] | null;
@@ -46,16 +47,20 @@ export async function getOverview(
   endDate: Date
 ): Promise<OverviewResult> {
   const where = baseTaskWhere(organizationId, scope);
+  const [doneKeys, blockedKeys] = await Promise.all([
+    getStatusKeysByCategory(organizationId, ["DONE"]),
+    getStatusKeysByCategory(organizationId, ["BLOCKED"]),
+  ]);
 
   const [tasksCreated, tasksCompletedTasks, tasksOpen, tasksBlocked, logs, subtaskAgg, comments, activities] =
     await Promise.all([
       prisma.task.count({ where: { ...where, createdAt: { gte: startDate, lte: endDate } } }),
       prisma.task.findMany({
-        where: { ...where, status: "DONE", completedAt: { gte: startDate, lte: endDate } },
+        where: { ...where, status: { in: doneKeys }, completedAt: { gte: startDate, lte: endDate } },
         select: { id: true, completedAt: true },
       }),
-      prisma.task.count({ where: { ...where, status: { not: "DONE" } } }),
-      prisma.task.count({ where: { ...where, status: "BLOCKED" } }),
+      prisma.task.count({ where: { ...where, status: { notIn: doneKeys } } }),
+      prisma.task.count({ where: { ...where, status: { in: blockedKeys } } }),
       prisma.taskLog.findMany({
         where: {
           date: { gte: startDate, lte: endDate },
@@ -103,7 +108,9 @@ export async function getOverview(
     ]);
 
   const subtaskTotal = subtaskAgg._count._all;
-  const subtaskDone = await prisma.task.count({ where: { ...where, parentTaskId: { not: null }, status: "DONE" } });
+  const subtaskDone = await prisma.task.count({
+    where: { ...where, parentTaskId: { not: null }, status: { in: doneKeys } },
+  });
 
   const hoursByDayMap = new Map<string, number>();
   let hoursLoggedTotal = 0;

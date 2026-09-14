@@ -5,6 +5,13 @@ import { paginationMeta, toSkipTake } from "../../lib/pagination.js";
 import { z } from "zod";
 import { createTaskSchema, updateTaskSchema, listTasksQuerySchema, addCommentSchema, logTimeSchema } from "./tasks.schemas.js";
 import { Prisma } from "@prisma/client";
+import {
+  assertValidStatusKey,
+  getDefaultStatusKey,
+  getRecurringDefaultStatusKey,
+  getStatusCategory,
+  getStatusKeysByCategory,
+} from "../../lib/taskStatuses.js";
 
 const taskInclude = {
   assignee: { select: { id: true, name: true, avatarUrl: true } },
@@ -62,7 +69,9 @@ export async function listTasks(
     ...(query.search
       ? { OR: [{ title: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }] }
       : {}),
-    ...(query.view === "backlog" ? { status: "BACKLOG" } : {}),
+    ...(query.view === "backlog"
+      ? { status: { in: await getStatusKeysByCategory(organizationId, ["BACKLOG"]) } }
+      : {}),
     ...(query.view === "ongoing" ? { isRecurring: true } : {}),
     ...(query.view === "board" ? { isRecurring: false } : {}),
   };
@@ -124,12 +133,21 @@ export async function createTask(
     if (!parentDepartmentId) parentDepartmentId = parent.departmentId ?? undefined;
   }
 
+  let statusKey = input.status;
+  if (statusKey) {
+    await assertValidStatusKey(organizationId, statusKey);
+  } else {
+    statusKey = input.isRecurring
+      ? await getRecurringDefaultStatusKey(organizationId)
+      : await getDefaultStatusKey(organizationId);
+  }
+
   const task = await prisma.task.create({
     data: {
       organizationId,
       title: input.title,
       description: input.description,
-      status: input.status,
+      status: statusKey,
       priority: input.priority,
       isRecurring: input.isRecurring,
       assigneeId: input.assigneeId,
@@ -185,8 +203,15 @@ export async function updateTask(
   const { tags, watcherIds, ...rest } = input;
 
   const data: Prisma.TaskUpdateInput = { ...rest };
-  if (rest.status === "DONE" && existing.status !== "DONE") data.completedAt = new Date();
-  if (rest.status && rest.status !== "DONE") data.completedAt = null;
+  if (rest.status && rest.status !== existing.status) {
+    await assertValidStatusKey(organizationId, rest.status);
+    const [newCategory, oldCategory] = await Promise.all([
+      getStatusCategory(organizationId, rest.status),
+      getStatusCategory(organizationId, existing.status),
+    ]);
+    if (newCategory === "DONE" && oldCategory !== "DONE") data.completedAt = new Date();
+    if (oldCategory === "DONE" && newCategory !== "DONE") data.completedAt = null;
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     if (tags) {
@@ -269,9 +294,14 @@ export async function addComment(
     });
 
     if (input.statusChangedTo && input.statusChangedTo !== task.status) {
+      await assertValidStatusKey(organizationId, input.statusChangedTo);
+      const [newCategory, oldCategory] = await Promise.all([
+        getStatusCategory(organizationId, input.statusChangedTo),
+        getStatusCategory(organizationId, task.status),
+      ]);
       const data: Prisma.TaskUpdateInput = { status: input.statusChangedTo };
-      if (input.statusChangedTo === "DONE") data.completedAt = new Date();
-      if (task.status === "DONE" && input.statusChangedTo !== "DONE") data.completedAt = null;
+      if (newCategory === "DONE") data.completedAt = new Date();
+      if (oldCategory === "DONE" && newCategory !== "DONE") data.completedAt = null;
       await tx.task.update({ where: { id: taskId }, data });
     }
 

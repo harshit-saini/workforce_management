@@ -1,10 +1,12 @@
 import { z } from "zod";
-import { TaskStatus, TaskPriority } from "@prisma/client";
+import { TaskPriority } from "@prisma/client";
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().optional(),
-  status: z.nativeEnum(TaskStatus).default("BACKLOG"),
+  // Validated against the organization's configured statuses at the service layer.
+  // Falls back to the org's default status when omitted.
+  status: z.string().optional(),
   priority: z.nativeEnum(TaskPriority).default("MEDIUM"),
   isRecurring: z.boolean().default(false),
   assigneeId: z.string().optional(),
@@ -20,7 +22,7 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().optional().nullable(),
-  status: z.nativeEnum(TaskStatus).optional(),
+  status: z.string().optional(),
   priority: z.nativeEnum(TaskPriority).optional(),
   isRecurring: z.boolean().optional(),
   assigneeId: z.string().optional().nullable(),
@@ -36,7 +38,7 @@ export const updateTaskSchema = z.object({
 export const listTasksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(500).default(25),
-  status: z.nativeEnum(TaskStatus).optional(),
+  status: z.string().optional(),
   view: z.enum(["backlog", "board", "ongoing", "all"]).default("all"),
   priority: z.nativeEnum(TaskPriority).optional(),
   assigneeId: z.string().optional(),
@@ -52,7 +54,7 @@ export const listTasksQuerySchema = z.object({
 
 export const addCommentSchema = z.object({
   comment: z.string().min(1),
-  statusChangedTo: z.nativeEnum(TaskStatus).optional(),
+  statusChangedTo: z.string().optional(),
 });
 
 export const logTimeSchema = z.object({

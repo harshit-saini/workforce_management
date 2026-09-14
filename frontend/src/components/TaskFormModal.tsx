@@ -1,6 +1,6 @@
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { api } from "@/lib/api";
-import { useCenters, useDepartments, useUsersList } from "@/hooks/useLookups";
+import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import { TaskPriority, TaskStatus } from "@/types";
 
@@ -15,11 +15,20 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const { data: users } = useUsersList();
+  const { data: statuses } = useTaskStatuses();
+  const selectableStatuses = statuses?.filter((s) => !s.isRecurringDefault) ?? [];
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
-  const [status, setStatus] = useState<TaskStatus>("BACKLOG");
+  const [status, setStatus] = useState<TaskStatus>("");
+
+  useEffect(() => {
+    if (!status && selectableStatuses.length > 0) {
+      setStatus(selectableStatuses.find((s) => s.isDefault)?.key ?? selectableStatuses[0].key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statuses]);
   const [assigneeId, setAssigneeId] = useState("");
   const [centerId, setCenterId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -34,11 +43,12 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
     setError(null);
     setSubmitting(true);
     try {
+      const recurringStatusKey = statuses?.find((s) => s.isRecurringDefault)?.key;
       const payload = {
         title,
         description: description || undefined,
         priority,
-        status: isRecurring ? "ONGOING" : status,
+        status: isRecurring ? recurringStatusKey : status || undefined,
         isRecurring,
         assigneeId: assigneeId || undefined,
         centerId: centerId || undefined,
@@ -87,12 +97,11 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
                 disabled={isRecurring}
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
               >
-                <option value="BACKLOG">Backlog</option>
-                <option value="TODO">To do</option>
-                <option value="IN_PROGRESS">In progress</option>
-                <option value="IN_REVIEW">In review</option>
-                <option value="BLOCKED">Blocked</option>
-                <option value="DONE">Done</option>
+                {selectableStatuses.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
               </select>
             </FormField>
           </div>

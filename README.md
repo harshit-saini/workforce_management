@@ -150,16 +150,29 @@ Nginx (`:5173`), wired together with the env vars in `docker-compose.yml`.
 
 Implemented: multi-tenant auth & invites, RBAC, centers, departments,
 hierarchy (tree view, cycle-prevention, CSV bulk import, downline/chain
-queries), full task management (backlog/kanban/ongoing views, subtasks,
-comment+status-change activity log, time logging, file attachments),
-the flexible-time-span overview dashboard, in-app + email-stub notifications
-with per-type/channel preferences and cron-driven reminders, weekly report
-generation/submission/review, monthly report generation with team rollups,
-an audit log for role/manager/task reassignment, and a seed script + unit
-tests for the highest-risk logic (cycle prevention, aggregation math).
+queries), full task management (backlog/kanban/ongoing views with a smooth
+drag-and-drop board, subtasks, an editable task detail view with assignee
+reassignment, comment+status-change activity log, time logging, file
+attachments with inline image/PDF previews), organization-configurable
+task statuses (Jira-style custom workflow — add/rename/recolor/reorder
+statuses from Settings, each mapped to a BACKLOG/ACTIVE/DONE/BLOCKED
+category that drives aggregation), the flexible-time-span overview
+dashboard, in-app + email-stub notifications with per-type/channel
+preferences and cron-driven reminders, weekly report generation/submission/
+review, monthly report generation with team rollups, an audit log for
+role/manager/task reassignment, and a seed script + unit tests for the
+highest-risk logic (cycle prevention, aggregation math).
+
+Attachments support optional S3-compatible object storage (`S3_ENDPOINT` /
+`S3_BUCKET` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_PUBLIC_URL_BASE`
+in `backend/.env.example`) — works with Cloudflare R2's free tier, AWS S3,
+Backblaze B2, or MinIO. Falls back to local disk when unset, which is fine
+for local dev but **not for most free hosting tiers** (e.g. Render's free
+web services have an ephemeral filesystem that's wiped on redeploy/restart —
+configure S3-compatible storage before relying on attachments in production).
 
 Not yet implemented (natural follow-ups): PDF/CSV export of
 reports/dashboard snapshots, TOTP 2FA, WebSocket push for notifications
-(currently polled), and a production S3/SES integration (the code is
-structured so swapping the local-disk/console-log stubs for real providers
-is a small, isolated change).
+(currently polled), and a production email provider (SES/SendGrid — currently
+stubbed to console logging, isolated to `src/lib/notify.ts` and
+`auth.service.ts`/`users.service.ts`'s invite emails).

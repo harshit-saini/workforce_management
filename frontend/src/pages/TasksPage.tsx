@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Paginated, Task, TaskStatus } from "@/types";
-import { useCenters, useDepartments, useUsersList } from "@/hooks/useLookups";
+import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import KanbanBoard from "@/components/KanbanBoard";
 import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
@@ -15,13 +16,16 @@ export default function TasksPage() {
   const [assigneeId, setAssigneeId] = useState("");
   const [centerId, setCenterId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebouncedValue(searchInput);
   const [showCreate, setShowCreate] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const { data: users } = useUsersList();
+  const { data: statuses } = useTaskStatuses();
+  const boardStatuses = statuses?.filter((s) => !s.isRecurringDefault) ?? [];
   const queryClient = useQueryClient();
 
   const filters = {
@@ -38,9 +42,25 @@ export default function TasksPage() {
     queryFn: async () => (await api.get<Paginated<Task>>("/tasks", { params: filters })).data,
   });
 
+  const tasksQueryKey = ["tasks", filters];
+
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => api.patch(`/tasks/${id}`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey });
+      const previous = queryClient.getQueryData<Paginated<Task>>(tasksQueryKey);
+      if (previous) {
+        queryClient.setQueryData<Paginated<Task>>(tasksQueryKey, {
+          ...previous,
+          items: previous.items.map((t) => (t.id === id ? { ...t, status } : t)),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(tasksQueryKey, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
 
   function refetchTasks() {
@@ -73,8 +93,8 @@ export default function TasksPage() {
       <div className="flex flex-wrap gap-2">
         <input
           placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-48"
         />
         <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
@@ -104,7 +124,12 @@ export default function TasksPage() {
       </div>
 
       {tab === "board" && (
-        <KanbanBoard tasks={tasks} onOpen={setOpenTaskId} onStatusChange={(id, status) => updateStatus.mutate({ id, status })} />
+        <KanbanBoard
+          statuses={boardStatuses}
+          tasks={tasks}
+          onOpen={setOpenTaskId}
+          onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+        />
       )}
       {(tab === "list" || tab === "ongoing") && <TaskListTable tasks={tasks} onOpen={setOpenTaskId} />}
 

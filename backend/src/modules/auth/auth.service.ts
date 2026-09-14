@@ -5,6 +5,7 @@ import { generateOpaqueToken, hashToken, msFromDuration } from "../../lib/tokens
 import { config } from "../../lib/config.js";
 import { z } from "zod";
 import { signupSchema, loginSchema, acceptInviteSchema } from "./auth.schemas.js";
+import { seedDefaultTaskStatuses } from "../../lib/defaultStatuses.js";
 
 function slugify(name: string): string {
   return (
@@ -39,6 +40,7 @@ export async function signup(input: z.infer<typeof signupSchema>) {
     const organization = await tx.organization.create({
       data: { name: input.organizationName, slug },
     });
+    await seedDefaultTaskStatuses(tx, organization.id);
     const user = await tx.user.create({
       data: {
         organizationId: organization.id,
