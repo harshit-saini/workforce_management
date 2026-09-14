@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { generateOpaqueToken } from "../../lib/tokens.js";
+import { sendEmail } from "../../lib/email.js";
+import { config } from "../../lib/config.js";
 import { AuthUser } from "../../plugins/auth.js";
 import { paginationMeta, toSkipTake } from "../../lib/pagination.js";
 import { z } from "zod";
@@ -98,8 +100,17 @@ export async function inviteUser(
     },
   });
 
-  // Email delivery is stubbed for local/dev: log instead of sending via SES/SendGrid.
-  console.log(`[email:invite] to=${invite.email} token=${invite.token} expiresAt=${invite.expiresAt.toISOString()}`);
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  const inviteUrl = `${config.frontendUrl}/invite/${invite.token}`;
+  await sendEmail({
+    to: invite.email,
+    subject: `You're invited to join ${organization?.name ?? "your team"} on Workforce Management`,
+    html: `
+      <p>You've been invited to join <strong>${organization?.name ?? "your team"}</strong> as ${input.role.toLowerCase()}.</p>
+      <p><a href="${inviteUrl}">Accept your invite</a></p>
+      <p>This link expires on ${invite.expiresAt.toDateString()}.</p>
+    `,
+  });
 
   return invite;
 }

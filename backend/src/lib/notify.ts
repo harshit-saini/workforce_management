@@ -1,5 +1,17 @@
 import { prisma } from "./prisma.js";
 import { NotificationType } from "@prisma/client";
+import { sendEmail } from "./email.js";
+
+const NOTIFICATION_SUBJECT: Record<NotificationType, string> = {
+  TASK_DUE_SOON: "Task due soon",
+  TASK_OVERDUE: "Task overdue",
+  NO_TIME_LOGGED: "No time logged on your task",
+  WEEKLY_REPORT_DUE: "Your weekly report is due",
+  MONTHLY_REPORT_PENDING: "Monthly report review pending",
+  TASK_ASSIGNED: "You were assigned a task",
+  COMMENT_MENTION: "New activity on a task you're watching",
+  MANUAL_NUDGE: "A reminder from your manager",
+};
 
 interface NotifyParams {
   organizationId: string;
@@ -44,7 +56,14 @@ export async function notifyUser(params: NotifyParams): Promise<boolean> {
   });
 
   if (emailEnabled) {
-    console.log(`[email:notification] to=${params.userId} type=${params.type} message="${params.message}"`);
+    const user = await prisma.user.findUnique({ where: { id: params.userId }, select: { email: true, name: true } });
+    if (user) {
+      await sendEmail({
+        to: user.email,
+        subject: NOTIFICATION_SUBJECT[params.type],
+        html: `<p>Hi ${user.name},</p><p>${params.message}</p>`,
+      });
+    }
   }
 
   return true;
