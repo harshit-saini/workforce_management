@@ -42,6 +42,15 @@ export const config = {
     .split(",")
     .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean),
+  // Used to build links in outgoing emails (invite links, etc).
+  frontendUrl: (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(/\/+$/, ""),
+  // Optional real email delivery via Resend (https://resend.com, free tier: 100/day).
+  // Falls back to logging the email to the console when unset.
+  email: {
+    enabled: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
+    resendApiKey: process.env.RESEND_API_KEY,
+    from: process.env.EMAIL_FROM,
+  },
   cron: {
     reminderScan: process.env.REMINDER_SCAN_CRON ?? "0 * * * *",
     weeklyReportDeadline: process.env.WEEKLY_REPORT_DEADLINE_CRON ?? "0 12 * * 1",
