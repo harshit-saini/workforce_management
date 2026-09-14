@@ -15,6 +15,7 @@ import WeeklyTeamReportPage from "@/pages/WeeklyTeamReportPage";
 import MonthlyReportPage from "@/pages/MonthlyReportPage";
 import MonthlyTeamReportPage from "@/pages/MonthlyTeamReportPage";
 import NotificationsPage from "@/pages/NotificationsPage";
+import SettingsPage from "@/pages/SettingsPage";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="reports/monthly" element={<MonthlyReportPage />} />
         <Route path="reports/monthly/team" element={<MonthlyTeamReportPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

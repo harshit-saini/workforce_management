@@ -39,10 +39,17 @@ const activities = [
 const taskCountMock = vi.fn(async (args: any) => {
   const where = args.where;
   if (where.createdAt) return 12; // tasksCreated
-  if (where.parentTaskId && where.status === "DONE") return 1; // subtaskDone
-  if (where.status === "BLOCKED") return 2; // tasksBlocked
-  if (where.status?.not === "DONE") return 4; // tasksOpen
+  if (where.parentTaskId && where.status?.in) return 1; // subtaskDone
+  if (where.status?.in?.includes("BLOCKED")) return 2; // tasksBlocked
+  if (where.status?.notIn) return 4; // tasksOpen
   throw new Error("Unexpected task.count call: " + JSON.stringify(where));
+});
+
+const taskStatusOptionFindManyMock = vi.fn(async (args: any) => {
+  const categories: string[] = args.where.category.in;
+  if (categories.includes("DONE")) return [{ key: "DONE" }];
+  if (categories.includes("BLOCKED")) return [{ key: "BLOCKED" }];
+  return [];
 });
 
 vi.mock("../../../lib/prisma.js", () => ({
@@ -60,6 +67,9 @@ vi.mock("../../../lib/prisma.js", () => ({
     },
     taskActivity: {
       findMany: vi.fn().mockResolvedValue(activities),
+    },
+    taskStatusOption: {
+      findMany: taskStatusOptionFindManyMock,
     },
   },
 }));

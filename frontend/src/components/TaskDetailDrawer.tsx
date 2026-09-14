@@ -5,11 +5,9 @@ import { api } from "@/lib/api";
 import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity } from "@/types";
 import TaskFormModal from "@/components/TaskFormModal";
 import AttachmentPreview from "@/components/AttachmentPreview";
-import { useCenters, useDepartments, useUsersList } from "@/hooks/useLookups";
+import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
-
-const statusOptions: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "ONGOING", "IN_REVIEW", "BLOCKED", "DONE"];
 
 interface EditForm {
   title: string;
@@ -59,6 +57,11 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const { data: users } = useUsersList();
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
+  const { data: statuses } = useTaskStatuses();
+
+  function statusLabel(key: string): string {
+    return statuses?.find((s) => s.key === key)?.label ?? key;
+  }
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["task", taskId] });
@@ -150,7 +153,12 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               </button>
             </div>
             <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
-              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.status}</span>
+              <span
+                className="px-2 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: statuses?.find((s) => s.key === task.status)?.color ?? "#6b7280" }}
+              >
+                {statusLabel(task.status)}
+              </span>
               <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.priority}</span>
               <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.assignee?.name ?? "Unassigned"}</span>
               {task.center && <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.center.name}</span>}
@@ -314,12 +322,12 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 onChange={(e) => setStatusChangedTo(e.target.value as TaskStatus)}
                 className="border border-gray-300 rounded-md px-2 py-1.5 text-sm"
               >
-                <option value="">Keep status ({task.status})</option>
-                {statusOptions
-                  .filter((s) => s !== task.status)
+                <option value="">Keep status ({statusLabel(task.status)})</option>
+                {statuses
+                  ?.filter((s) => s.key !== task.status)
                   .map((s) => (
-                    <option key={s} value={s}>
-                      Move to {s}
+                    <option key={s.key} value={s.key}>
+                      Move to {s.label}
                     </option>
                   ))}
               </select>
@@ -408,7 +416,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                     <div className="text-gray-800">
                       <span className="font-medium">{item.user.name}</span>
                       {item.statusChangedTo && (
-                        <span className="text-xs text-brand-600 ml-2">→ moved to {item.statusChangedTo}</span>
+                        <span className="text-xs text-brand-600 ml-2">→ moved to {statusLabel(item.statusChangedTo)}</span>
                       )}
                     </div>
                     <div className="text-gray-600">{item.comment}</div>

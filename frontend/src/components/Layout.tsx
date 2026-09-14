@@ -15,6 +15,7 @@ const navItems = [
   { to: "/users", label: "Users", roles: ["OWNER", "ADMIN"] },
   { to: "/centers", label: "Centers", roles: ["OWNER", "ADMIN"] },
   { to: "/departments", label: "Departments", roles: ["OWNER", "ADMIN"] },
+  { to: "/settings", label: "Settings", roles: ["OWNER", "ADMIN"] },
 ];
 
 export default function Layout() {

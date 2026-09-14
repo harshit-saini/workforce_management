@@ -16,6 +16,7 @@ import tasksRoutes from "./modules/tasks/tasks.routes.js";
 import overviewRoutes from "./modules/overview/overview.routes.js";
 import notificationsRoutes from "./modules/notifications/notifications.routes.js";
 import reportsRoutes from "./modules/reports/reports.routes.js";
+import settingsRoutes from "./modules/settings/settings.routes.js";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -35,6 +36,7 @@ export function buildApp() {
   app.register(overviewRoutes, { prefix: "/api" });
   app.register(notificationsRoutes, { prefix: "/api" });
   app.register(reportsRoutes, { prefix: "/api" });
+  app.register(settingsRoutes, { prefix: "/api" });
 
   app.get("/api/health", async () => ({ status: "ok" }));
 

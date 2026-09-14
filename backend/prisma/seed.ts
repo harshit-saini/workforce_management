@@ -1,5 +1,6 @@
-import { PrismaClient, TaskStatus, TaskPriority } from "@prisma/client";
+import { PrismaClient, TaskPriority } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { seedDefaultTaskStatuses } from "../src/lib/defaultStatuses.js";
 
 const prisma = new PrismaClient();
 
@@ -13,6 +14,7 @@ async function main() {
   const org = await prisma.organization.create({
     data: { name: "Acme Analytics", slug: "acme-analytics" },
   });
+  await seedDefaultTaskStatuses(prisma, org.id);
 
   const [noida, gurgaon] = await Promise.all([
     prisma.center.create({
@@ -146,7 +148,7 @@ async function main() {
   console.log(`Created ${allStaff.length + 1} users`);
 
   // ── Tasks ─────────────────────────────────────────────────────────────
-  const statuses: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED"];
+  const statuses: string[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED"];
   const priorities: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
   const taskTitles = [
