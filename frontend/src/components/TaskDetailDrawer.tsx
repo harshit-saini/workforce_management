@@ -2,9 +2,10 @@ import { useRef, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
-import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity } from "@/types";
+import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachment } from "@/types";
 import TaskFormModal from "@/components/TaskFormModal";
 import AttachmentPreview from "@/components/AttachmentPreview";
+import AttachmentViewerModal from "@/components/AttachmentViewerModal";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
@@ -36,6 +37,7 @@ function toEditForm(task: Task): EditForm {
 export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [viewingAttachment, setViewingAttachment] = useState<TaskAttachment | null>(null);
   const [comment, setComment] = useState("");
   const [statusChangedTo, setStatusChangedTo] = useState<TaskStatus | "">("");
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
@@ -397,7 +399,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
           {uploadAttachment.isPending && <div className="text-xs text-gray-400 mb-2">Uploading…</div>}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {task.attachments?.map((att) => (
-              <AttachmentPreview key={att.id} attachment={att} />
+              <AttachmentPreview key={att.id} attachment={att} onClick={() => setViewingAttachment(att)} />
             ))}
           </div>
           {(!task.attachments || task.attachments.length === 0) && (
@@ -438,6 +440,9 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
 
       {showSubtaskForm && (
         <TaskFormModal parentTaskId={taskId} onClose={() => setShowSubtaskForm(false)} onCreated={invalidate} />
+      )}
+      {viewingAttachment && (
+        <AttachmentViewerModal attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
       )}
     </div>
   );
