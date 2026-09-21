@@ -1,7 +1,8 @@
 import { useState, FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
-import { Role } from "@/types";
+import { Invite, Role } from "@/types";
 import { useUsersList, useCenters, useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 
@@ -13,6 +14,21 @@ export default function UsersPage() {
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const queryClient = useQueryClient();
+
+  const { data: invites } = useQuery({
+    queryKey: ["invites"],
+    queryFn: async () => (await api.get<Invite[]>("/users/invites")).data,
+  });
+
+  const resendInvite = useMutation({
+    mutationFn: (id: string) => api.post(`/users/invites/${id}/resend`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
+  });
+
+  const cancelInvite = useMutation({
+    mutationFn: (id: string) => api.delete(`/users/invites/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
+  });
 
   const updateRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) => api.patch(`/users/${id}/role`, { role }),
@@ -157,12 +173,62 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+      {invites && invites.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="px-4 py-3 border-b border-gray-100 text-sm font-medium text-gray-700">
+            Pending invites
+          </div>
+          <div className="divide-y divide-gray-100">
+            {invites.map((invite) => {
+              const expired = new Date(invite.expiresAt) < new Date();
+              return (
+                <div key={invite.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div>
+                    <div className="text-gray-800">{invite.email}</div>
+                    <div className="text-xs text-gray-400">
+                      {invite.role} · sent {formatDistanceToNow(new Date(invite.createdAt), { addSuffix: true })} ·{" "}
+                      {expired ? (
+                        <span className="text-red-500">expired</span>
+                      ) : (
+                        <>expires {formatDistanceToNow(new Date(invite.expiresAt), { addSuffix: true })}</>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => resendInvite.mutate(invite.id)}
+                      disabled={resendInvite.isPending}
+                      className="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Cancel the invite to ${invite.email}?`)) cancelInvite.mutate(invite.id);
+                      }}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showInvite && (
+        <InviteModal
+          onClose={() => setShowInvite(false)}
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ["invites"] })}
+        />
+      )}
     </div>
   );
 }
 
-function InviteModal({ onClose }: { onClose: () => void }) {
+function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const [email, setEmail] = useState("");
@@ -183,6 +249,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
         departmentId: departmentId || undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      onCreated();
       onClose();
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Failed to send invite");

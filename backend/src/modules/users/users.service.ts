@@ -71,6 +71,20 @@ export async function getUser(organizationId: string, userId: string) {
   return user;
 }
 
+async function sendInviteEmail(organizationId: string, invite: { email: string; role: Role; token: string; expiresAt: Date }) {
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  const inviteUrl = `${config.frontendUrl}/invite/${invite.token}`;
+  await sendEmail({
+    to: invite.email,
+    subject: `You're invited to join ${organization?.name ?? "your team"} on Workforce Management`,
+    html: `
+      <p>You've been invited to join <strong>${organization?.name ?? "your team"}</strong> as ${invite.role.toLowerCase()}.</p>
+      <p><a href="${inviteUrl}">Accept your invite</a></p>
+      <p>This link expires on ${invite.expiresAt.toDateString()}.</p>
+    `,
+  });
+}
+
 export async function inviteUser(
   organizationId: string,
   input: z.infer<typeof inviteUserSchema>
@@ -100,17 +114,7 @@ export async function inviteUser(
     },
   });
 
-  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
-  const inviteUrl = `${config.frontendUrl}/invite/${invite.token}`;
-  await sendEmail({
-    to: invite.email,
-    subject: `You're invited to join ${organization?.name ?? "your team"} on Workforce Management`,
-    html: `
-      <p>You've been invited to join <strong>${organization?.name ?? "your team"}</strong> as ${input.role.toLowerCase()}.</p>
-      <p><a href="${inviteUrl}">Accept your invite</a></p>
-      <p>This link expires on ${invite.expiresAt.toDateString()}.</p>
-    `,
-  });
+  await sendInviteEmail(organizationId, invite);
 
   return invite;
 }
@@ -120,6 +124,36 @@ export async function listInvites(organizationId: string) {
     where: { organizationId, acceptedAt: null },
     orderBy: { createdAt: "desc" },
   });
+}
+
+/**
+ * Regenerates the token/expiry and re-attempts delivery. Needed because invite
+ * creation and email delivery aren't atomic (a bad email config shouldn't roll
+ * back the invite), which otherwise leaves a pending invite that can never be
+ * retried since a new invite to the same email is blocked while one is active.
+ */
+export async function resendInvite(organizationId: string, inviteId: string) {
+  const invite = await prisma.invite.findFirst({ where: { id: inviteId, organizationId, acceptedAt: null } });
+  if (!invite) throw AppError.notFound("Invite not found or already accepted");
+
+  const updated = await prisma.invite.update({
+    where: { id: inviteId },
+    data: {
+      token: generateOpaqueToken(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  await sendInviteEmail(organizationId, updated);
+
+  return updated;
+}
+
+export async function cancelInvite(organizationId: string, inviteId: string) {
+  const invite = await prisma.invite.findFirst({ where: { id: inviteId, organizationId, acceptedAt: null } });
+  if (!invite) throw AppError.notFound("Invite not found or already accepted");
+
+  await prisma.invite.delete({ where: { id: inviteId } });
 }
 
 export async function updateSelf(userId: string, input: z.infer<typeof selfUpdateSchema>) {
