@@ -20,6 +20,18 @@ export interface Organization {
   name: string;
   slug: string;
 }
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: Role;
+  centerId: string | null;
+  departmentId: string | null;
+  managerId: string | null;
+  title: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type ReportStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED";
 export type NotificationType =

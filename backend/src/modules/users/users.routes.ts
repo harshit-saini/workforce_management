@@ -40,6 +40,25 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     }
   );
 
+  fastify.post(
+    "/users/invites/:id/resend",
+    { preHandler: fastify.requireRole("OWNER", "ADMIN") },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      return usersService.resendInvite(request.authUser.organizationId, id);
+    }
+  );
+
+  fastify.delete(
+    "/users/invites/:id",
+    { preHandler: fastify.requireRole("OWNER", "ADMIN") },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await usersService.cancelInvite(request.authUser.organizationId, id);
+      return reply.code(204).send();
+    }
+  );
+
   fastify.patch("/users/me", async (request) => {
     const input = selfUpdateSchema.parse(request.body);
     return usersService.updateSelf(request.authUser.id, input);
