@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import * as reportsService from "./reports.service.js";
 import { AppError } from "../../lib/errors.js";
+import { prisma } from "../../lib/prisma.js";
 import { getReportingChainUp } from "../../lib/hierarchy.js";
 import {
   weeklyQuerySchema,
@@ -11,8 +12,18 @@ import {
   monthlyTeamSummaryQuerySchema,
 } from "./reports.schemas.js";
 
+/**
+ * Confirms targetUserId belongs to organizationId before applying any role-based shortcut —
+ * without this, an ADMIN/OWNER/MANAGER's role check alone would let them pass a user id from
+ * a different organization and read that user's report data.
+ */
 async function assertCanViewUserReport(fastify: FastifyInstance, actorId: string, actorRole: string, targetUserId: string, organizationId: string) {
-  if (actorId === targetUserId || actorRole === "ADMIN" || actorRole === "OWNER") return;
+  if (actorId === targetUserId) return;
+
+  const target = await prisma.user.findFirst({ where: { id: targetUserId, organizationId }, select: { id: true } });
+  if (!target) throw AppError.forbidden("You cannot view this user's report");
+
+  if (actorRole === "ADMIN" || actorRole === "OWNER") return;
   if (actorRole === "MANAGER") {
     const chain = await getReportingChainUp(organizationId, targetUserId);
     if (chain.includes(actorId)) return;
