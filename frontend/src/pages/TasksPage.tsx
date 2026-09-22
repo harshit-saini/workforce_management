@@ -8,6 +8,8 @@ import KanbanBoard from "@/components/KanbanBoard";
 import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
+import { IconPlus, IconSearch } from "@/components/icons";
+import { btnPrimary } from "@/lib/ui";
 
 type Tab = "board" | "list" | "ongoing";
 
@@ -72,31 +74,37 @@ export default function TasksPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {(["board", "list", "ongoing"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-1.5 text-sm rounded-md capitalize ${
-                tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Tasks</h1>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mt-2">
+            {(["board", "list", "ongoing"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3 py-1.5 text-sm rounded-md capitalize transition-colors ${
+                  tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
-        <button onClick={() => setShowCreate(true)} className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700">
-          + New task
+        <button onClick={() => setShowCreate(true)} className={btnPrimary}>
+          <IconPlus className="w-4 h-4" /> New task
         </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <input
-          placeholder="Search…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-48"
-        />
+        <div className="relative">
+          <IconSearch className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            placeholder="Search…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="border border-gray-300 rounded-md pl-8 pr-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          />
+        </div>
         <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All assignees</option>
           {users?.items.map((u) => (

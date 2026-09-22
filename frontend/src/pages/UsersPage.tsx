@@ -5,6 +5,9 @@ import { api } from "@/lib/api";
 import { Invite, Role } from "@/types";
 import { useUsersList, useCenters, useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
+import Avatar from "@/components/Avatar";
+import { IconPlus } from "@/components/icons";
+import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 
 const roles: Role[] = ["ADMIN", "MANAGER", "EMPLOYEE"];
 
@@ -49,15 +52,12 @@ export default function UsersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Users</h1>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700"
-        >
-          Invite user
+        <button onClick={() => setShowInvite(true)} className={btnPrimary}>
+          <IconPlus className="w-4 h-4" /> Invite user
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+      <div className={`${card} overflow-x-auto`}>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
@@ -74,8 +74,13 @@ export default function UsersPage() {
             {data?.items.map((u) => (
               <tr key={u.id} className="border-t border-gray-100">
                 <td className="px-4 py-2">
-                  <div className="font-medium text-gray-800">{u.name}</div>
-                  <div className="text-xs text-gray-400">{u.email}</div>
+                  <div className="flex items-center gap-2">
+                    <Avatar name={u.name} size="sm" />
+                    <div>
+                      <div className="font-medium text-gray-800">{u.name}</div>
+                      <div className="text-xs text-gray-400">{u.email}</div>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-2">
                   {u.role === "OWNER" ? (
@@ -174,7 +179,7 @@ export default function UsersPage() {
       </div>
 
       {invites && invites.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className={card}>
           <div className="px-4 py-3 border-b border-gray-100 text-sm font-medium text-gray-700">
             Pending invites
           </div>
@@ -258,7 +263,7 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+      <div className="bg-white rounded-xl shadow-popover p-6 w-full max-w-sm">
         <h2 className="text-base font-semibold mb-4">Invite user</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Email">
@@ -293,10 +298,10 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </FormField>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm rounded-md border border-gray-300">
+            <button type="button" onClick={onClose} className={btnSecondary}>
               Cancel
             </button>
-            <button type="submit" className="px-3 py-1.5 text-sm rounded-md bg-brand-600 text-white hover:bg-brand-700">
+            <button type="submit" className={btnPrimary}>
               Send invite
             </button>
           </div>

@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import FormField, { inputClass } from "@/components/FormField";
+import { btnPrimary } from "@/lib/ui";
 
 export default function SignupPage() {
   const { signup } = useAuth();
@@ -29,7 +30,13 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+      <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-card border border-gray-200/80">
+        <div className="flex items-center gap-2 mb-6">
+          <span className="w-8 h-8 rounded-md bg-brand-600 text-white flex items-center justify-center font-bold text-sm">
+            W
+          </span>
+          <span className="font-semibold text-gray-800">Workforce Mgmt</span>
+        </div>
         <h1 className="text-xl font-semibold mb-1 text-gray-900">Create your workspace</h1>
         <p className="text-sm text-gray-500 mb-6">Set up your organization and owner account</p>
         <form onSubmit={onSubmit}>
@@ -53,11 +60,7 @@ export default function SignupPage() {
             />
           </FormField>
           {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-600 text-white rounded-md py-2 text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className={`w-full ${btnPrimary} py-2`}>
             {loading ? "Creating…" : "Create workspace"}
           </button>
         </form>

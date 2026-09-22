@@ -20,16 +20,14 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[220px] rounded-xl p-2 transition-colors duration-150 ${isOver ? "bg-brand-50" : "bg-gray-100"}`}
+      className={`flex-1 min-w-[260px] max-w-[320px] rounded-lg border-t-[3px] transition-colors duration-150 ${isOver ? "bg-brand-50" : "bg-gray-100/70"}`}
+      style={{ borderTopColor: color }}
     >
-      <div className="text-xs font-semibold text-gray-500 uppercase px-1 py-1.5 flex items-center justify-between">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          {label}
-        </span>
-        <span className="bg-gray-200 text-gray-600 rounded-full px-1.5">{tasks.length}</span>
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2.5 py-2.5 flex items-center justify-between sticky top-0">
+        <span className="truncate">{label}</span>
+        <span className="bg-gray-200 text-gray-600 rounded-full text-[11px] px-1.5 py-0.5 font-medium shrink-0 ml-2">{tasks.length}</span>
       </div>
-      <div className="min-h-[40px]">
+      <div className="min-h-[40px] px-2 pb-2">
         {tasks.map((t) => (
           <TaskCard key={t.id} task={t} onOpen={() => onOpen(t.id)} />
         ))}
@@ -70,7 +68,7 @@ export default function KanbanBoard({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveTask(null)}>
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="flex gap-3 overflow-x-auto pb-2 items-start">
         {statuses.map((s) => (
           <Column
             key={s.key}
@@ -84,7 +82,7 @@ export default function KanbanBoard({
       </div>
       <DragOverlay dropAnimation={{ duration: 150, easing: "ease-out" }}>
         {activeTask ? (
-          <div className="rotate-2 w-[220px]">
+          <div className="rotate-2 w-[260px]">
             <TaskCardContent task={activeTask} />
           </div>
         ) : null}
