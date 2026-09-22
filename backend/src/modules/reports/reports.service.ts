@@ -78,8 +78,10 @@ export async function generateWeeklyReport(organizationId: string, userId: strin
 
 export async function getWeeklyReport(organizationId: string, userId: string, anyDateInWeek: Date) {
   const weekStartDate = startOfWeek(anyDateInWeek);
-  const existing = await prisma.weeklyReport.findUnique({
-    where: { userId_weekStartDate: { userId, weekStartDate } },
+  // Scoped by organizationId in addition to the userId/weekStartDate unique key, as defense in
+  // depth against a caller passing a mismatched org — see assertCanViewUserReport in routes.
+  const existing = await prisma.weeklyReport.findFirst({
+    where: { userId, weekStartDate, organizationId },
   });
   const report = existing ?? (await generateWeeklyReport(organizationId, userId, anyDateInWeek));
 
@@ -260,7 +262,8 @@ export async function generateMonthlyReport(organizationId: string, userId: stri
 }
 
 async function getMonthlyReportRecord(organizationId: string, userId: string, year: number, month: number) {
-  const existing = await prisma.monthlyReport.findUnique({ where: { userId_year_month: { userId, year, month } } });
+  // Scoped by organizationId in addition to the unique key — see getWeeklyReport above.
+  const existing = await prisma.monthlyReport.findFirst({ where: { userId, year, month, organizationId } });
   return existing ?? generateMonthlyReport(organizationId, userId, year, month);
 }
 
