@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import { TaskPriority, TaskStatus } from "@/types";
+import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 interface Props {
   onClose: () => void;
@@ -72,7 +73,7 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-popover p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-base font-semibold mb-4">{parentTaskId ? "Add subtask" : "New task"}</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Title">
@@ -151,10 +152,10 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
           </div>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm rounded-md border border-gray-300">
+            <button type="button" onClick={onClose} className={btnSecondary}>
               Cancel
             </button>
-            <button type="submit" disabled={submitting} className="px-3 py-1.5 text-sm rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">
+            <button type="submit" disabled={submitting} className={btnPrimary}>
               {submitting ? "Saving…" : "Create"}
             </button>
           </div>

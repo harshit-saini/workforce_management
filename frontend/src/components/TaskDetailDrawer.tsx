@@ -6,6 +6,11 @@ import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachme
 import TaskFormModal from "@/components/TaskFormModal";
 import AttachmentPreview from "@/components/AttachmentPreview";
 import AttachmentViewerModal from "@/components/AttachmentViewerModal";
+import StatusBadge from "@/components/StatusBadge";
+import PriorityBadge from "@/components/PriorityBadge";
+import Avatar from "@/components/Avatar";
+import { IconPlus, IconUpload, IconX } from "@/components/icons";
+import { btnPrimary, btnSecondary } from "@/lib/ui";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
@@ -140,7 +145,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
-          ✕
+          <IconX className="w-5 h-5" />
         </button>
 
         {!isEditing ? (
@@ -154,18 +159,16 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 Edit
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
-              <span
-                className="px-2 py-0.5 rounded-full text-white"
-                style={{ backgroundColor: statuses?.find((s) => s.key === task.status)?.color ?? "#6b7280" }}
-              >
-                {statusLabel(task.status)}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-2">
+              <StatusBadge label={statusLabel(task.status)} color={statuses?.find((s) => s.key === task.status)?.color ?? "#6b7280"} />
+              <PriorityBadge priority={task.priority} showLabel />
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100">
+                <Avatar name={task.assignee?.name} size="xs" />
+                {task.assignee?.name ?? "Unassigned"}
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.priority}</span>
-              <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.assignee?.name ?? "Unassigned"}</span>
-              {task.center && <span className="px-2 py-0.5 rounded-full bg-gray-100">{task.center.name}</span>}
+              {task.center && <span className="px-2 py-0.5 rounded bg-gray-100">{task.center.name}</span>}
               {task.dueDate && (
-                <span className="px-2 py-0.5 rounded-full bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
+                <span className="px-2 py-0.5 rounded bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
               )}
             </div>
             {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
@@ -268,18 +271,10 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
             </div>
             {saveEdit.isError && <p className="text-xs text-red-600 mb-2">Could not save changes.</p>}
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={saveEdit.isPending}
-                className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700 disabled:opacity-50"
-              >
+              <button type="submit" disabled={saveEdit.isPending} className={btnPrimary}>
                 Save
               </button>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-              >
+              <button type="button" onClick={() => setIsEditing(false)} className={btnSecondary}>
                 Cancel
               </button>
             </div>
@@ -292,8 +287,8 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
             <h3 className="text-sm font-semibold text-gray-700">
               Subtasks {task.subtasks && task.subtasks.length > 0 && `(${task.subtasks.filter((s) => s.status === "DONE").length}/${task.subtasks.length})`}
             </h3>
-            <button onClick={() => setShowSubtaskForm(true)} className="text-xs text-brand-600 hover:underline">
-              + Add subtask
+            <button onClick={() => setShowSubtaskForm(true)} className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
+              <IconPlus className="w-3.5 h-3.5" /> Add subtask
             </button>
           </div>
           <div className="space-y-1">
@@ -333,11 +328,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                     </option>
                   ))}
               </select>
-              <button
-                type="submit"
-                disabled={addComment.isPending}
-                className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700 disabled:opacity-50"
-              >
+              <button type="submit" disabled={addComment.isPending} className={btnPrimary}>
                 Update
               </button>
             </div>
@@ -359,11 +350,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-20"
             />
             <span className="text-xs text-gray-400">hours</span>
-            <button
-              onClick={() => logTime.mutate()}
-              disabled={logTime.isPending}
-              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-            >
+            <button onClick={() => logTime.mutate()} disabled={logTime.isPending} className={btnSecondary}>
               Log
             </button>
             <button
@@ -371,7 +358,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 setLogHours("8");
                 logTime.mutate();
               }}
-              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
+              className={btnSecondary}
             >
               Log full day (8h)
             </button>
@@ -382,8 +369,8 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
         <section className="mt-6 border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-700">Attachments</h3>
-            <button onClick={() => fileInputRef.current?.click()} className="text-xs text-brand-600 hover:underline">
-              + Upload file
+            <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
+              <IconUpload className="w-3.5 h-3.5" /> Upload file
             </button>
             <input
               ref={fileInputRef}

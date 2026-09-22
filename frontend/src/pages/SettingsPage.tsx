@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import { Organization, StatusCategory, TaskStatusOption } from "@/types";
 import { useTaskStatuses } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
+import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
+import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -70,23 +72,19 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-3xl">
       <h1 className="text-lg font-semibold text-gray-900">Settings</h1>
 
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <section className={`${card} p-4`}>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Organization</h2>
         <div className="flex items-end gap-2">
           <FormField label="Organization name">
             <input className={inputClass} value={orgName} onChange={(e) => setOrgName(e.target.value)} />
           </FormField>
-          <button
-            onClick={() => saveOrg.mutate()}
-            disabled={saveOrg.isPending}
-            className="mb-4 bg-brand-600 text-white text-sm px-3 py-2 rounded-md hover:bg-brand-700 disabled:opacity-50"
-          >
+          <button onClick={() => saveOrg.mutate()} disabled={saveOrg.isPending} className={`mb-4 ${btnPrimary}`}>
             Save
           </button>
         </div>
       </section>
 
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <section className={`${card} p-4`}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-sm font-semibold text-gray-700">Task statuses</h2>
@@ -95,8 +93,8 @@ export default function SettingsPage() {
               dashboards and reports (e.g. completion rate looks at the "Done" category).
             </p>
           </div>
-          <button onClick={() => setShowAdd(true)} className="text-sm text-brand-600 hover:underline shrink-0">
-            + Add status
+          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline shrink-0">
+            <IconPlus className="w-4 h-4" /> Add status
           </button>
         </div>
 
@@ -117,18 +115,18 @@ export default function SettingsPage() {
                 <button
                   onClick={() => moveStatus(i, -1)}
                   disabled={i === 0}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs leading-none"
+                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move up"
                 >
-                  ▲
+                  <IconChevronUp className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => moveStatus(i, 1)}
                   disabled={!statuses || i === statuses.length - 1}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs leading-none"
+                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move down"
                 >
-                  ▼
+                  <IconChevronDown className="w-3.5 h-3.5" />
                 </button>
               </div>
               <input
@@ -176,7 +174,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   if (confirm(`Delete status "${s.label}"?`)) deleteStatus.mutate(s.id);
                 }}
-                className="text-xs text-red-600 hover:underline justify-self-end"
+                className="text-xs text-red-600 hover:underline justify-self-end shrink-0"
               >
                 Delete
               </button>
@@ -239,14 +237,10 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
           </FormField>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm rounded-md border border-gray-300">
+            <button type="button" onClick={onClose} className={btnSecondary}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-3 py-1.5 text-sm rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={submitting} className={btnPrimary}>
               Create
             </button>
           </div>

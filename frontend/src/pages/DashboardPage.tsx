@@ -68,31 +68,32 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Tasks created" value={data.tasksCreated} />
-            <StatCard label="Tasks completed" value={data.tasksCompleted} />
-            <StatCard label="Still open" value={data.tasksOpen} />
-            <StatCard label="Blocked" value={data.tasksBlocked} />
-            <StatCard label="Hours logged" value={data.hoursLoggedTotal.toFixed(1)} />
+            <StatCard label="Tasks created" value={data.tasksCreated} accent="#0c66e4" />
+            <StatCard label="Tasks completed" value={data.tasksCompleted} accent="#216e4e" />
+            <StatCard label="Still open" value={data.tasksOpen} accent="#946f00" />
+            <StatCard label="Blocked" value={data.tasksBlocked} accent="#ae2e24" />
+            <StatCard label="Hours logged" value={data.hoursLoggedTotal.toFixed(1)} accent="#5e4db2" />
             <StatCard
               label="Subtasks done"
               value={`${data.subtaskCompletion.done}/${data.subtaskCompletion.total}`}
+              accent="#0c66e4"
             />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-gray-200/80 shadow-card p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Hours logged by day</div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.hoursByDay}>
                   <XAxis dataKey="date" tickFormatter={(d) => format(new Date(d), "MMM d")} fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip labelFormatter={(d) => format(new Date(d), "MMM d, yyyy")} />
-                  <Bar dataKey="hours" fill="#3182f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="hours" fill="#0c66e4" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-gray-200/80 shadow-card p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Activity timeline</div>
               <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
                 {data.activityTimeline.length === 0 && <div className="text-sm text-gray-400 py-4">No activity in this range</div>}

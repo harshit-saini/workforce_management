@@ -3,6 +3,8 @@ import { TaskAttachment } from "@/types";
 import { resolveFileUrl } from "@/lib/api";
 import { downloadFile } from "@/lib/download";
 import { getFileKind, FILE_KIND_ICON, formatFileSize } from "@/lib/fileKind";
+import { IconZoomIn, IconZoomOut, IconDownload, IconX } from "@/components/icons";
+import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
 
@@ -34,7 +36,7 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-popover w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
           <div className="min-w-0">
             <div className="text-sm font-medium text-gray-800 truncate">{attachment.fileName}</div>
@@ -46,30 +48,27 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
                 <button
                   onClick={zoomOut}
                   disabled={zoomIndex === 0}
-                  className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                  className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-30"
                   aria-label="Zoom out"
                 >
-                  −
+                  <IconZoomOut className="w-4 h-4" />
                 </button>
                 <span className="text-xs text-gray-500 w-10 text-center">{Math.round(zoom * 100)}%</span>
                 <button
                   onClick={zoomIn}
                   disabled={zoomIndex === ZOOM_STEPS.length - 1}
-                  className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-30"
+                  className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-30"
                   aria-label="Zoom in"
                 >
-                  +
+                  <IconZoomIn className="w-4 h-4" />
                 </button>
               </div>
             )}
-            <button
-              onClick={() => downloadFile(url, attachment.fileName)}
-              className="text-xs px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-            >
-              Download
+            <button onClick={() => downloadFile(url, attachment.fileName)} className={btnSecondary}>
+              <IconDownload className="w-4 h-4" /> Download
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1" aria-label="Close">
-              ✕
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 px-1" aria-label="Close">
+              <IconX className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -91,11 +90,8 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <span className="text-5xl">{FILE_KIND_ICON[kind]}</span>
               <p className="text-sm text-gray-500">Preview isn't available for this file type.</p>
-              <button
-                onClick={() => downloadFile(url, attachment.fileName)}
-                className="bg-brand-600 text-white text-sm px-4 py-2 rounded-md hover:bg-brand-700"
-              >
-                Download {attachment.fileName}
+              <button onClick={() => downloadFile(url, attachment.fileName)} className={btnPrimary}>
+                <IconDownload className="w-4 h-4" /> Download {attachment.fileName}
               </button>
             </div>
           )}

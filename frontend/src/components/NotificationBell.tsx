@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
+import { IconBell } from "@/components/icons";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -32,7 +33,7 @@ export default function NotificationBell() {
         className="relative rounded-full p-2 hover:bg-gray-100"
         aria-label="Notifications"
       >
-        🔔
+        <IconBell className="w-5 h-5" />
         {!!data?.unreadCount && (
           <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
             {data.unreadCount}
@@ -40,7 +41,7 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-popover z-20">
           <div className="p-3 border-b border-gray-100 font-medium text-sm">Notifications</div>
           <div className="max-h-80 overflow-y-auto">
             {data?.items.length ? (
