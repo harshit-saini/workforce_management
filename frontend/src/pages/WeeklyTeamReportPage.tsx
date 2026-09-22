@@ -7,6 +7,7 @@ interface TeamRow {
   user: { id: string; name: string; email: string };
   report: { id: string; status: string; tasksCompleted: number; hoursLogged: number; summary: string | null } | null;
   status: "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "PENDING" | "OVERDUE";
+  overdueTaskCount: number;
 }
 
 const statusColor: Record<string, string> = {
@@ -60,6 +61,11 @@ export default function WeeklyTeamReportPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {row.overdueTaskCount > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                  {row.overdueTaskCount} overdue
+                </span>
+              )}
               <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[row.status]}`}>{row.status}</span>
               {row.report && row.status === "SUBMITTED" && (
                 <>

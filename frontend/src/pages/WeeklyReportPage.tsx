@@ -4,6 +4,8 @@ import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { WeeklyReport } from "@/types";
 import StatCard from "@/components/StatCard";
+import ReportTaskList from "@/components/ReportTaskList";
+import { btnPrimary } from "@/lib/ui";
 
 export default function WeeklyReportPage() {
   const [summary, setSummary] = useState("");
@@ -35,11 +37,25 @@ export default function WeeklyReportPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Completed" value={report.tasksCompleted} />
-        <StatCard label="Carried over" value={report.tasksCarriedOver} />
-        <StatCard label="Blocked" value={report.tasksBlocked} />
-        <StatCard label="Hours logged" value={report.hoursLogged.toFixed(1)} sub={`${report.daysLogged} days`} />
+        <StatCard label="Completed" value={report.tasksCompleted} accent="#216e4e" />
+        <StatCard label="Carried over" value={report.tasksCarriedOver} accent="#946f00" />
+        <StatCard label="Blocked" value={report.tasksBlocked} accent="#ae2e24" />
+        <StatCard label="Hours logged" value={report.hoursLogged.toFixed(1)} sub={`${report.daysLogged} days`} accent="#5e4db2" />
       </div>
+
+      <ReportTaskList
+        title="Completed this week"
+        tasks={report.completedTasks}
+        emptyLabel="No tasks completed yet this week"
+        dateField="completedAt"
+      />
+      <ReportTaskList
+        title="Overdue"
+        tasks={report.overdueTasks}
+        emptyLabel="Nothing overdue"
+        dateField="dueDate"
+        overdue
+      />
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Summary / blockers / highlights</label>
@@ -51,11 +67,7 @@ export default function WeeklyReportPage() {
           onChange={(e) => setSummary(e.target.value)}
         />
         {(report.status === "DRAFT" || report.status === "CHANGES_REQUESTED") && (
-          <button
-            onClick={() => submit.mutate()}
-            disabled={submit.isPending}
-            className="mt-3 bg-brand-600 text-white text-sm px-4 py-2 rounded-md hover:bg-brand-700 disabled:opacity-50"
-          >
+          <button onClick={() => submit.mutate()} disabled={submit.isPending} className={`mt-3 ${btnPrimary}`}>
             Submit report
           </button>
         )}

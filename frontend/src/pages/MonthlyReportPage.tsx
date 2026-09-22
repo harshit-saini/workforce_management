@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { MonthlyReport } from "@/types";
 import StatCard from "@/components/StatCard";
+import ReportTaskList from "@/components/ReportTaskList";
 
 export default function MonthlyReportPage() {
   const now = new Date();
@@ -35,11 +36,25 @@ export default function MonthlyReportPage() {
       {report && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Completion rate" value={`${(report.completionRate * 100).toFixed(0)}%`} />
-            <StatCard label="Tasks completed" value={report.tasksCompleted} sub={`of ${report.tasksPlanned} planned`} />
-            <StatCard label="Hours logged" value={report.hoursLogged.toFixed(1)} sub={`of ${report.hoursExpected} expected`} />
-            <StatCard label="Days logged" value={report.daysLogged} />
+            <StatCard label="Completion rate" value={`${(report.completionRate * 100).toFixed(0)}%`} accent="#0c66e4" />
+            <StatCard label="Tasks completed" value={report.tasksCompleted} sub={`of ${report.tasksPlanned} planned`} accent="#216e4e" />
+            <StatCard label="Hours logged" value={report.hoursLogged.toFixed(1)} sub={`of ${report.hoursExpected} expected`} accent="#5e4db2" />
+            <StatCard label="Days logged" value={report.daysLogged} accent="#946f00" />
           </div>
+
+          <ReportTaskList
+            title="Completed this month"
+            tasks={report.completedTasks}
+            emptyLabel="No tasks completed yet this month"
+            dateField="completedAt"
+          />
+          <ReportTaskList
+            title="Overdue"
+            tasks={report.overdueTasks}
+            emptyLabel="Nothing overdue"
+            dateField="dueDate"
+            overdue
+          />
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <div className="text-sm font-medium text-gray-700 mb-2">Weekly completion trend</div>
