@@ -180,6 +180,15 @@ export interface OverviewResult {
   completedByDay: { date: string; count: number }[];
 }
 
+export interface ReportTaskSummary {
+  id: string;
+  title: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  dueDate: string | null;
+  completedAt: string | null;
+}
+
 export interface WeeklyReport {
   id: string;
   userId: string;
@@ -195,6 +204,8 @@ export interface WeeklyReport {
   managerComment: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
+  completedTasks: ReportTaskSummary[];
+  overdueTasks: ReportTaskSummary[];
 }
 
 export interface MonthlyReport {
@@ -211,6 +222,8 @@ export interface MonthlyReport {
   weeklyBreakdownJson: { weekStartDate: string; tasksCompleted: number; hoursLogged: number }[] | null;
   topBlockersJson: { word: string; count: number }[] | null;
   generatedAt: string;
+  completedTasks: ReportTaskSummary[];
+  overdueTasks: ReportTaskSummary[];
 }
 
 export interface HierarchyNode {

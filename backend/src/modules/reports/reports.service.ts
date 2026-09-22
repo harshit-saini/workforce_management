@@ -4,6 +4,7 @@ import { AuthUser } from "../../plugins/auth.js";
 import { getOverview } from "../overview/overview.service.js";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from "../../lib/dates.js";
 import { getDownlineUserIds, getReportingChainUp } from "../../lib/hierarchy.js";
+import { getStatusKeysByCategory } from "../../lib/taskStatuses.js";
 import { z } from "zod";
 import { submitWeeklySchema, reviewWeeklySchema } from "./reports.schemas.js";
 
@@ -11,6 +12,35 @@ const STOPWORDS = new Set([
   "the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "for", "is", "was", "are", "were",
   "with", "at", "by", "from", "this", "that", "it", "as", "be", "we", "i", "my", "our", "will",
 ]);
+
+const reportTaskSelect = {
+  id: true,
+  title: true,
+  priority: true,
+  status: true,
+  dueDate: true,
+  completedAt: true,
+} as const;
+
+/** Tasks the user completed with a completedAt inside the given range — mirrors getOverview's "tasksCompleted". */
+async function listCompletedTasksInRange(organizationId: string, userId: string, start: Date, end: Date) {
+  const doneKeys = await getStatusKeysByCategory(organizationId, ["DONE"]);
+  return prisma.task.findMany({
+    where: { organizationId, assigneeId: userId, status: { in: doneKeys }, completedAt: { gte: start, lte: end } },
+    select: reportTaskSelect,
+    orderBy: { completedAt: "desc" },
+  });
+}
+
+/** Tasks currently past their due date and not done — same predicate as the overdue-task reminder job. */
+async function listOverdueTasksForUser(organizationId: string, userId: string) {
+  const doneKeys = await getStatusKeysByCategory(organizationId, ["DONE"]);
+  return prisma.task.findMany({
+    where: { organizationId, assigneeId: userId, status: { notIn: doneKeys }, dueDate: { lt: new Date() } },
+    select: reportTaskSelect,
+    orderBy: { dueDate: "asc" },
+  });
+}
 
 export async function generateWeeklyReport(organizationId: string, userId: string, anyDateInWeek: Date) {
   const weekStartDate = startOfWeek(anyDateInWeek);
@@ -51,8 +81,14 @@ export async function getWeeklyReport(organizationId: string, userId: string, an
   const existing = await prisma.weeklyReport.findUnique({
     where: { userId_weekStartDate: { userId, weekStartDate } },
   });
-  if (existing) return existing;
-  return generateWeeklyReport(organizationId, userId, anyDateInWeek);
+  const report = existing ?? (await generateWeeklyReport(organizationId, userId, anyDateInWeek));
+
+  const [completedTasks, overdueTasks] = await Promise.all([
+    listCompletedTasksInRange(organizationId, userId, report.weekStartDate, report.weekEndDate),
+    listOverdueTasksForUser(organizationId, userId),
+  ]);
+
+  return { ...report, completedTasks, overdueTasks };
 }
 
 export async function submitWeeklyReport(
@@ -129,6 +165,14 @@ export async function weeklyTeamSummary(
   const now = new Date();
   const deadlinePassed = now > addDays(weekStartDate, 7);
 
+  const doneKeys = await getStatusKeysByCategory(organizationId, ["DONE"]);
+  const overdueCounts = await prisma.task.groupBy({
+    by: ["assigneeId"],
+    where: { organizationId, assigneeId: { in: users.map((u) => u.id) }, status: { notIn: doneKeys }, dueDate: { lt: now } },
+    _count: { _all: true },
+  });
+  const overdueByUser = new Map(overdueCounts.map((o) => [o.assigneeId, o._count._all]));
+
   return users.map((user) => {
     const report = byUser.get(user.id);
     let status: "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "PENDING" | "OVERDUE";
@@ -137,7 +181,7 @@ export async function weeklyTeamSummary(
     } else {
       status = report.status as any;
     }
-    return { user, report: report ?? null, status };
+    return { user, report: report ?? null, status, overdueTaskCount: overdueByUser.get(user.id) ?? 0 };
   });
 }
 
@@ -215,10 +259,20 @@ export async function generateMonthlyReport(organizationId: string, userId: stri
   });
 }
 
-export async function getMonthlyReport(organizationId: string, userId: string, year: number, month: number) {
+async function getMonthlyReportRecord(organizationId: string, userId: string, year: number, month: number) {
   const existing = await prisma.monthlyReport.findUnique({ where: { userId_year_month: { userId, year, month } } });
-  if (existing) return existing;
-  return generateMonthlyReport(organizationId, userId, year, month);
+  return existing ?? generateMonthlyReport(organizationId, userId, year, month);
+}
+
+export async function getMonthlyReport(organizationId: string, userId: string, year: number, month: number) {
+  const report = await getMonthlyReportRecord(organizationId, userId, year, month);
+
+  const [completedTasks, overdueTasks] = await Promise.all([
+    listCompletedTasksInRange(organizationId, userId, startOfMonth(year, month), endOfMonth(year, month)),
+    listOverdueTasksForUser(organizationId, userId),
+  ]);
+
+  return { ...report, completedTasks, overdueTasks };
 }
 
 export async function monthlyTeamSummary(
@@ -246,7 +300,7 @@ export async function monthlyTeamSummary(
   });
 
   const reports = await Promise.all(
-    users.map((u) => getMonthlyReport(organizationId, u.id, year, month).then((r) => ({ user: u, report: r })))
+    users.map((u) => getMonthlyReportRecord(organizationId, u.id, year, month).then((r) => ({ user: u, report: r })))
   );
 
   const avgCompletionRate =
