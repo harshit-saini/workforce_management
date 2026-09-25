@@ -50,6 +50,11 @@ export default function LoginPage() {
               required
             />
           </FormField>
+          <div className="text-right -mt-2 mb-4">
+            <Link to="/forgot-password" className="text-xs text-brand-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
           <button type="submit" disabled={loading} className={`w-full ${btnPrimary} py-2`}>
             {loading ? "Signing in…" : "Sign in"}

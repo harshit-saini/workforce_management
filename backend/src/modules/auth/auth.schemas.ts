@@ -20,3 +20,11 @@ export const acceptInviteSchema = z.object({
   name: z.string().min(1).max(120),
   password: z.string().min(8).max(128),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8).max(128),
+});

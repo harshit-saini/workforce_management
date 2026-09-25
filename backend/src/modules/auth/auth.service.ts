@@ -3,9 +3,12 @@ import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../lib/errors.js";
 import { generateOpaqueToken, hashToken, msFromDuration } from "../../lib/tokens.js";
 import { config } from "../../lib/config.js";
+import { sendEmail } from "../../lib/email.js";
 import { z } from "zod";
 import { signupSchema, loginSchema, acceptInviteSchema } from "./auth.schemas.js";
 import { seedDefaultTaskStatuses } from "../../lib/defaultStatuses.js";
+
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function slugify(name: string): string {
   return (
@@ -133,4 +136,67 @@ export async function acceptInvite(token: string, input: z.infer<typeof acceptIn
   });
 
   return user;
+}
+
+/**
+ * Always resolves the same way regardless of whether the email matches an account, so the
+ * response can't be used to enumerate registered emails. Any earlier outstanding reset token
+ * for the user is invalidated so at most one link is ever valid at a time.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.deletedAt || user.status !== "ACTIVE") return;
+
+  const token = generateOpaqueToken();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } }),
+  ]);
+
+  const resetUrl = `${config.frontendUrl}/reset-password/${token}`;
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your password",
+    html: `
+      <p>We received a request to reset the password for your account.</p>
+      <p><a href="${resetUrl}">Choose a new password</a></p>
+      <p>This link expires in 1 hour and can only be used once. If you didn't request this, you can safely ignore this email — your password won't be changed.</p>
+    `,
+  });
+}
+
+/** Read-only check used by the reset-password page to show an upfront "link expired" state without consuming the token. */
+export async function isPasswordResetTokenValid(rawToken: string): Promise<boolean> {
+  const tokenHash = hashToken(rawToken);
+  const record = await prisma.passwordResetToken.findFirst({ where: { tokenHash } });
+  return !!record && !record.usedAt && record.expiresAt > new Date();
+}
+
+/**
+ * Consumes a password-reset token exactly once and, since a reset implies the account may have
+ * been at risk, revokes every existing refresh token so all other sessions are signed out.
+ */
+export async function resetPassword(rawToken: string, newPassword: string): Promise<void> {
+  const tokenHash = hashToken(rawToken);
+  const record = await prisma.passwordResetToken.findFirst({ where: { tokenHash } });
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
+    throw AppError.badRequest("This password reset link is invalid or has expired");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+    prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+    prisma.refreshToken.updateMany({
+      where: { userId: record.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
 }

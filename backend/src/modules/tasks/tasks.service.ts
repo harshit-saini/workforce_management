@@ -98,17 +98,17 @@ export async function getTaskOrThrow(organizationId: string, accessibleUserIds: 
   return task;
 }
 
-async function assertAssigneeInScope(
-  organizationId: string,
-  actor: AuthUser,
-  accessibleUserIds: string[] | null,
-  assigneeId?: string | null
-) {
-  if (!assigneeId) return;
-  if (accessibleUserIds === null) return; // admin/owner: unrestricted
-  if (!accessibleUserIds.includes(assigneeId)) {
-    throw AppError.forbidden("You cannot assign tasks outside your reporting scope or center");
-  }
+/**
+ * Any org member can be assigned a task — assignment isn't restricted to a manager's reporting
+ * scope. This only confirms the assignee is an active member of the same organization (never a
+ * different tenant's user), and returns the record so callers can reuse it (e.g. auto-filling
+ * center) instead of re-querying.
+ */
+async function resolveAssigneeInOrg(organizationId: string, assigneeId?: string | null) {
+  if (!assigneeId) return null;
+  const assignee = await prisma.user.findFirst({ where: { id: assigneeId, organizationId, deletedAt: null } });
+  if (!assignee) throw AppError.badRequest("Assignee must be an active member of your organization");
+  return assignee;
 }
 
 export async function createTask(
@@ -117,12 +117,11 @@ export async function createTask(
   accessibleUserIds: string[] | null,
   input: z.infer<typeof createTaskSchema>
 ) {
-  await assertAssigneeInScope(organizationId, actor, accessibleUserIds, input.assigneeId);
+  const assigneeUser = await resolveAssigneeInOrg(organizationId, input.assigneeId);
 
   let centerId = input.centerId;
-  if (!centerId && input.assigneeId) {
-    const assignee = await prisma.user.findUnique({ where: { id: input.assigneeId } });
-    centerId = assignee?.centerId ?? undefined;
+  if (!centerId && assigneeUser) {
+    centerId = assigneeUser.centerId ?? undefined;
   }
   if (!centerId) centerId = actor.centerId ?? undefined;
 
@@ -197,7 +196,7 @@ export async function updateTask(
   const existing = await getTaskOrThrow(organizationId, accessibleUserIds, taskId);
 
   if (input.assigneeId !== undefined && input.assigneeId !== existing.assigneeId) {
-    await assertAssigneeInScope(organizationId, actor, accessibleUserIds, input.assigneeId);
+    await resolveAssigneeInOrg(organizationId, input.assigneeId);
   }
 
   const { tags, watcherIds, ...rest } = input;
