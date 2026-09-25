@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { config } from "./lib/config.js";
@@ -24,6 +25,8 @@ export function buildApp() {
   app.log.info({ allowedOrigins: config.corsOrigins }, "CORS configured");
   app.register(cors, { origin: config.corsOrigins, credentials: true });
   app.register(multipart, { limits: { fileSize: config.maxUploadMb * 1024 * 1024 } });
+  // global: false — no route is rate-limited unless it opts in via its own `config.rateLimit`.
+  app.register(rateLimit, { global: false });
   app.register(fastifyStatic, { root: path.resolve(config.uploadDir), prefix: "/uploads/" });
   app.register(authPlugin);
 
