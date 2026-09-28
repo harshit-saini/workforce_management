@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useCenters } from "@/hooks/useLookups";
 import QueryError, { LoadingText } from "@/components/QueryError";
@@ -74,7 +75,12 @@ export default function WeeklyTeamReportPage() {
         {data?.map((row) => (
           <div key={row.user.id} className="px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">{row.user.name}</div>
+              <Link
+                to={`/reports/weekly?userId=${row.user.id}`}
+                className="text-sm font-medium text-gray-800 hover:text-brand-700 hover:underline"
+              >
+                {row.user.name}
+              </Link>
               {row.report && (
                 <div className="text-xs text-gray-400">
                   {row.report.tasksCompleted} completed · {row.report.hoursLogged.toFixed(1)}h logged

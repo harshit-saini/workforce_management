@@ -2,6 +2,9 @@ import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
+import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { useUsersList } from "@/hooks/useLookups";
 import { api } from "@/lib/api";
 import { MonthlyReport } from "@/types";
 import StatCard from "@/components/StatCard";
@@ -10,20 +13,37 @@ import QueryError, { LoadingText } from "@/components/QueryError";
 
 export default function MonthlyReportPage() {
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [params] = useSearchParams();
+  const { user } = useAuth();
+  // ?userId= (plus optional month/year) lets managers open a team member's report from Team Monthly.
+  const requestedUserId = params.get("userId");
+  const viewingOther = !!requestedUserId && requestedUserId !== user?.id;
+  const { data: users } = useUsersList();
+  const subjectName = viewingOther ? users?.items.find((u) => u.id === requestedUserId)?.name ?? "Team member" : null;
+  const [month, setMonth] = useState(Number(params.get("month")) || now.getMonth() + 1);
+  const [year, setYear] = useState(Number(params.get("year")) || now.getFullYear());
 
   const reportQuery = useQuery({
-    queryKey: ["monthly-report", "self", month, year],
-    queryFn: async () => (await api.get<MonthlyReport>("/reports/monthly", { params: { month, year } })).data,
+    queryKey: ["monthly-report", viewingOther ? requestedUserId : "self", month, year],
+    queryFn: async () =>
+      (
+        await api.get<MonthlyReport>("/reports/monthly", {
+          params: { month, year, userId: viewingOther ? requestedUserId : undefined },
+        })
+      ).data,
     placeholderData: keepPreviousData,
   });
   const report = reportQuery.data;
 
   return (
     <div className="space-y-4 max-w-3xl">
+      {viewingOther && (
+        <Link to="/reports/monthly/team" className="text-xs text-brand-600 hover:underline">
+          ← Team monthly rollup
+        </Link>
+      )}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Monthly Report</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Monthly Report"}</h1>
         <div className="flex gap-2">
           <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -39,7 +59,7 @@ export default function MonthlyReportPage() {
       {!report &&
         (reportQuery.isError ? (
           <QueryError
-            title="Couldn't load your monthly report"
+            title={viewingOther ? "Couldn't load this monthly report" : "Couldn't load your monthly report"}
             error={reportQuery.error}
             onRetry={() => reportQuery.refetch()}
             retrying={reportQuery.isFetching}

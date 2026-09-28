@@ -7,7 +7,9 @@ import { OverviewResult } from "@/types";
 import DateRangePicker, { RangeValue } from "@/components/DateRangePicker";
 import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { OPEN_CATEGORIES, taskHref, tasksHref } from "@/lib/links";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 
 export default function DashboardPage() {
@@ -85,8 +87,18 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="Tasks created" value={data.tasksCreated} accent="#0c66e4" />
             <StatCard label="Tasks completed" value={data.tasksCompleted} accent="#216e4e" />
-            <StatCard label="Still open" value={data.tasksOpen} accent="#946f00" />
-            <StatCard label="Blocked" value={data.tasksBlocked} accent="#ae2e24" />
+            <StatCard
+              label="Still open"
+              value={data.tasksOpen}
+              accent="#946f00"
+              to={tasksHref({ view: "list", category: OPEN_CATEGORIES, center: centerId, department: departmentId })}
+            />
+            <StatCard
+              label="Blocked"
+              value={data.tasksBlocked}
+              accent="#ae2e24"
+              to={tasksHref({ view: "list", category: "BLOCKED", center: centerId, department: departmentId })}
+            />
             <StatCard label="Hours logged" value={data.hoursLoggedTotal.toFixed(1)} accent="#5e4db2" />
             <StatCard
               label="Subtasks done"
@@ -113,14 +125,19 @@ export default function DashboardPage() {
               <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
                 {data.activityTimeline.length === 0 && <div className="text-sm text-gray-400 py-4">No activity in this range</div>}
                 {data.activityTimeline.map((a) => (
-                  <div key={a.id} className="py-2 text-sm">
+                  <Link
+                    key={a.id}
+                    to={taskHref(a.taskId)}
+                    className="block py-2 px-2 -mx-2 rounded-md text-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+                  >
                     <div className="text-gray-800">
                       <span className="font-medium">{a.userName}</span> — {a.message}
                     </div>
                     <div className="text-xs text-gray-400">
-                      {a.taskTitle} · {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
+                      <span className="text-brand-700">{a.taskTitle}</span> ·{" "}
+                      {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>

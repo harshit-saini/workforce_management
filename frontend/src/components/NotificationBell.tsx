@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
+import { notificationHref } from "@/lib/links";
 import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { IconBell } from "@/components/icons";
@@ -11,6 +12,7 @@ import { IconBell } from "@/components/icons";
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isError } = useQuery({
     queryKey: ["notifications", "bell"],
@@ -25,9 +27,15 @@ export default function NotificationBell() {
     meta: { silentRefetchErrors: true },
   });
 
-  async function markRead(id: string) {
+  async function openNotification(n: Notification) {
+    const href = notificationHref(n);
+    if (href) {
+      setOpen(false);
+      navigate(href);
+    }
+    if (n.isRead) return;
     try {
-      await api.patch(`/notifications/${id}/read`);
+      await api.patch(`/notifications/${n.id}/read`);
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
       toast.error("Couldn't mark the notification as read", { description: getErrorMessage(err) });
@@ -56,7 +64,7 @@ export default function NotificationBell() {
               data.items.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => markRead(n.id)}
+                  onClick={() => openNotification(n)}
                   className={`w-full text-left px-3 py-2 border-b border-gray-50 text-sm hover:bg-gray-50 ${
                     n.isRead ? "text-gray-400" : "text-gray-800 font-medium"
                   }`}

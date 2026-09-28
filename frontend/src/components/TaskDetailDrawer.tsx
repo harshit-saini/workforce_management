@@ -6,11 +6,12 @@ import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachme
 import TaskFormModal from "@/components/TaskFormModal";
 import AttachmentPreview from "@/components/AttachmentPreview";
 import AttachmentViewerModal from "@/components/AttachmentViewerModal";
-import StatusBadge from "@/components/StatusBadge";
 import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
-import { IconPlus, IconUpload, IconX } from "@/components/icons";
-import { btnPrimary, btnSecondary } from "@/lib/ui";
+import { IconChevronDown, IconLink, IconPlus, IconUpload, IconX } from "@/components/icons";
+import { btnPrimary, btnSecondary, withAlpha } from "@/lib/ui";
+import { toast } from "@/lib/toast";
+import { taskHref } from "@/lib/links";
 import { getErrorMessage } from "@/lib/errors";
 import QueryError from "@/components/QueryError";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
@@ -46,7 +47,9 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [viewingAttachment, setViewingAttachment] = useState<TaskAttachment | null>(null);
   const [comment, setComment] = useState("");
-  const [statusChangedTo, setStatusChangedTo] = useState<TaskStatus | "">("");
+  /** Set while asking why the task is blocked, before moving it to a Blocked-category status. */
+  const [pendingBlockedStatus, setPendingBlockedStatus] = useState<TaskStatus | null>(null);
+  const [blockedReasonDraft, setBlockedReasonDraft] = useState("");
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [logHours, setLogHours] = useState("8");
   const [isEditing, setIsEditing] = useState(false);
@@ -80,27 +83,60 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   }
 
   const addComment = useMutation({
-    mutationFn: (vars: { comment: string; statusChangedTo?: TaskStatus }) => api.post(`/tasks/${taskId}/comments`, vars),
+    mutationFn: (vars: { comment: string }) => api.post(`/tasks/${taskId}/comments`, vars),
     onSuccess: () => {
       setComment("");
-      setStatusChangedTo("");
+      invalidate();
+    },
+    meta: { successMessage: "Comment added", errorTitle: "Couldn't post comment" },
+  });
+
+  // Same request as dragging a card on the board, so status never needs a comment.
+  type StatusVars = { status: TaskStatus; blockedReason?: string };
+  const changeStatus = useMutation({
+    mutationFn: (vars: StatusVars) => api.patch(`/tasks/${taskId}`, vars),
+    onSuccess: () => {
+      setPendingBlockedStatus(null);
+      setBlockedReasonDraft("");
       invalidate();
     },
     meta: {
-      successMessage: (_: unknown, vars: { statusChangedTo?: TaskStatus }) =>
-        vars.statusChangedTo ? `Moved to ${statusLabel(vars.statusChangedTo)}` : "Comment added",
-      errorTitle: (vars: { statusChangedTo?: TaskStatus }) =>
-        vars.statusChangedTo ? "Couldn't change status" : "Couldn't post comment",
+      successMessage: (_: unknown, v: StatusVars) => `Moved to ${statusLabel(v.status)}`,
+      errorTitle: (v: StatusVars) => `Couldn't move to ${statusLabel(v.status)}`,
     },
   });
 
+  function pickStatus(key: TaskStatus) {
+    if (!task || key === task.status) return;
+    if (statuses?.find((s) => s.key === key)?.category === "BLOCKED") {
+      setBlockedReasonDraft("");
+      setPendingBlockedStatus(key);
+      return;
+    }
+    setPendingBlockedStatus(null);
+    changeStatus.mutate({ status: key });
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${taskHref(taskId)}`);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn't copy the link", { description: "Copy it from the address bar instead." });
+    }
+  }
+
   const logTime = useMutation({
     // Hours/date are passed in (not read from state) so "Log full day" logs exactly what it says.
-    mutationFn: (vars: { date: string; hoursLogged: number }) => api.post(`/tasks/${taskId}/log`, vars),
+    mutationFn: (vars: { date: string; hoursLogged: number }) =>
+      api.post<{ previousHours: number | null }>(`/tasks/${taskId}/log`, vars),
     onSuccess: invalidate,
     meta: {
-      successMessage: (_: unknown, vars: { date: string; hoursLogged: number }) =>
-        `Logged ${vars.hoursLogged}h on ${format(new Date(`${vars.date}T00:00:00`), "MMM d")}`,
+      successMessage: (res: { data: { previousHours: number | null } }, vars: { date: string; hoursLogged: number }) => {
+        const day = format(new Date(`${vars.date}T00:00:00`), "MMM d");
+        const previous = res.data.previousHours;
+        return previous != null ? `Changed ${day} from ${previous}h to ${vars.hoursLogged}h` : `Logged ${vars.hoursLogged}h on ${day}`;
+      },
       errorTitle: "Couldn't log time",
     },
   });
@@ -140,7 +176,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   async function onCommentSubmit(e: FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
-    addComment.mutate({ comment, statusChangedTo: statusChangedTo || undefined });
+    addComment.mutate({ comment });
   }
 
   function startEditing() {
@@ -191,15 +227,26 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
           <>
             <div className="flex items-start justify-between pr-8 gap-2">
               <h2 className="text-lg font-semibold text-gray-900">{task.title}</h2>
-              <button
-                onClick={startEditing}
-                className="shrink-0 text-xs text-brand-600 hover:underline whitespace-nowrap mt-1"
-              >
-                Edit
-              </button>
+              <div className="shrink-0 flex items-center gap-3 mt-1">
+                <button
+                  onClick={copyLink}
+                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 whitespace-nowrap"
+                  title="Copy a link to this task"
+                >
+                  <IconLink className="w-3.5 h-3.5" /> Copy link
+                </button>
+                <button onClick={startEditing} className="text-xs text-brand-600 hover:underline whitespace-nowrap">
+                  Edit
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-2">
-              <StatusBadge label={statusLabel(task.status)} color={statuses?.find((s) => s.key === task.status)?.color ?? "#6b7280"} />
+              <StatusPicker
+                value={pendingBlockedStatus ?? task.status}
+                options={(statuses ?? []).filter((s) => !s.isRecurringDefault || task.isRecurring || s.key === task.status)}
+                disabled={changeStatus.isPending}
+                onChange={pickStatus}
+              />
               <PriorityBadge priority={task.priority} showLabel />
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100">
                 <Avatar name={task.assignee?.name} size="xs" />
@@ -210,6 +257,44 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 <span className="px-2 py-0.5 rounded bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
               )}
             </div>
+            {pendingBlockedStatus && (
+              <form
+                className="mt-3 rounded-md border border-red-200 bg-red-50 p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (blockedReasonDraft.trim()) {
+                    changeStatus.mutate({ status: pendingBlockedStatus, blockedReason: blockedReasonDraft.trim() });
+                  }
+                }}
+              >
+                <label className="block text-xs font-medium text-red-800 mb-1" htmlFor="blocked-reason">
+                  What's blocking this?
+                </label>
+                <input
+                  id="blocked-reason"
+                  autoFocus
+                  value={blockedReasonDraft}
+                  onChange={(e) => setBlockedReasonDraft(e.target.value)}
+                  placeholder="e.g. Waiting on the client's sign-off"
+                  className="w-full border border-red-200 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button type="submit" disabled={!blockedReasonDraft.trim() || changeStatus.isPending} className={btnPrimary}>
+                    Move to {statusLabel(pendingBlockedStatus)}
+                  </button>
+                  <button type="button" onClick={() => setPendingBlockedStatus(null)} className={btnSecondary}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+            {!pendingBlockedStatus &&
+              task.blockedReason &&
+              statuses?.find((s) => s.key === task.status)?.category === "BLOCKED" && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <span className="font-medium">Blocked:</span> {task.blockedReason}
+                </div>
+              )}
             {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
           </>
         ) : (
@@ -343,9 +428,9 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
           </div>
         </section>
 
-        {/* Update: comment + status */}
+        {/* Comment (status is changed from the picker at the top) */}
         <section className="mt-6 border-t border-gray-100 pt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Update task</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Comment</h3>
           <form onSubmit={onCommentSubmit}>
             <textarea
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
@@ -354,25 +439,9 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
-            <div className="flex items-center gap-2">
-              <select
-                value={statusChangedTo}
-                onChange={(e) => setStatusChangedTo(e.target.value as TaskStatus)}
-                className="border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              >
-                <option value="">Keep status ({statusLabel(task.status)})</option>
-                {statuses
-                  ?.filter((s) => s.key !== task.status)
-                  .map((s) => (
-                    <option key={s.key} value={s.key}>
-                      Move to {s.label}
-                    </option>
-                  ))}
-              </select>
-              <button type="submit" disabled={addComment.isPending} className={btnPrimary}>
-                Update
-              </button>
-            </div>
+            <button type="submit" disabled={!comment.trim() || addComment.isPending} className={btnPrimary}>
+              {addComment.isPending ? "Posting…" : "Comment"}
+            </button>
           </form>
         </section>
 
@@ -409,6 +478,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               Log full day (8h)
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-1.5">Logging the same day again replaces that day's hours.</p>
         </section>
 
         {/* Attachments */}
@@ -478,5 +548,40 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
         <AttachmentViewerModal attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
       )}
     </div>
+  );
+}
+
+/** The status lozenge doubles as the status control, Jira-style. */
+function StatusPicker({
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  value: TaskStatus;
+  options: { key: string; label: string; color: string }[];
+  disabled?: boolean;
+  onChange: (key: TaskStatus) => void;
+}) {
+  const current = options.find((o) => o.key === value);
+  const color = current?.color ?? "#6b7280";
+  return (
+    <span className="relative inline-flex items-center">
+      <select
+        aria-label="Status"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none cursor-pointer rounded pl-2 pr-6 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60 disabled:cursor-wait"
+        style={{ backgroundColor: withAlpha(color, "26"), color }}
+      >
+        {options.map((o) => (
+          <option key={o.key} value={o.key} className="text-gray-900 bg-white">
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <IconChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none" style={{ color }} />
+    </span>
   );
 }

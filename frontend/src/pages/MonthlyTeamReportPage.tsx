@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 import StatCard from "@/components/StatCard";
@@ -87,7 +88,12 @@ export default function MonthlyTeamReportPage() {
               <div className="text-sm font-medium text-gray-700 mb-2">Top performers</div>
               {data.topPerformers.map((p) => (
                 <div key={p.user.id} className="flex justify-between text-sm py-1">
-                  <span>{p.user.name}</span>
+                  <Link
+                    to={`/reports/monthly?userId=${p.user.id}&month=${month}&year=${year}`}
+                    className="hover:text-brand-700 hover:underline"
+                  >
+                    {p.user.name}
+                  </Link>
                   <span className="text-gray-500">{(p.report.completionRate * 100).toFixed(0)}%</span>
                 </div>
               ))}
@@ -97,7 +103,12 @@ export default function MonthlyTeamReportPage() {
               {data.atRisk.length === 0 && <div className="text-xs text-gray-400">None — nice work team</div>}
               {data.atRisk.map((p) => (
                 <div key={p.user.id} className="flex justify-between text-sm py-1">
-                  <span>{p.user.name}</span>
+                  <Link
+                    to={`/reports/monthly?userId=${p.user.id}&month=${month}&year=${year}`}
+                    className="hover:text-brand-700 hover:underline"
+                  >
+                    {p.user.name}
+                  </Link>
                   <span className="text-red-500">{(p.report.completionRate * 100).toFixed(0)}%</span>
                 </div>
               ))}
