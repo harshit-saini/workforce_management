@@ -1,18 +1,22 @@
 import { useEffect, useState, FormEvent } from "react";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
-import { TaskPriority, TaskStatus } from "@/types";
+import { Task, TaskPriority, TaskStatus } from "@/types";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  /** When given, the success toast offers an "Open" action for the new task. */
+  onOpenCreated?: (taskId: string) => void;
   parentTaskId?: string;
   defaultRecurring?: boolean;
 }
 
-export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaultRecurring }: Props) {
+export default function TaskFormModal({ onClose, onCreated, onOpenCreated, parentTaskId, defaultRecurring }: Props) {
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const { data: users } = useUsersList();
@@ -57,15 +61,17 @@ export default function TaskFormModal({ onClose, onCreated, parentTaskId, defaul
         dueDate: dueDate || undefined,
         estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
       };
-      if (parentTaskId) {
-        await api.post(`/tasks/${parentTaskId}/subtasks`, payload);
-      } else {
-        await api.post("/tasks", payload);
-      }
+      const { data: created } = parentTaskId
+        ? await api.post<Task>(`/tasks/${parentTaskId}/subtasks`, payload)
+        : await api.post<Task>("/tasks", payload);
+      toast.success(parentTaskId ? "Subtask created" : "Task created", {
+        description: created.title,
+        action: onOpenCreated ? { label: "Open", onClick: () => onOpenCreated(created.id) } : undefined,
+      });
       onCreated();
       onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Failed to create task");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create task"));
     } finally {
       setSubmitting(false);
     }

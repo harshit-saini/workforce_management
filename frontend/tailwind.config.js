@@ -33,6 +33,15 @@ export default {
         card: "0 1px 2px rgba(9, 30, 66, 0.08), 0 0 1px rgba(9, 30, 66, 0.16)",
         popover: "0 4px 8px rgba(9, 30, 66, 0.15), 0 0 1px rgba(9, 30, 66, 0.2)",
       },
+      keyframes: {
+        "toast-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "toast-in": "toast-in 160ms ease-out",
+      },
     },
   },
   plugins: [],

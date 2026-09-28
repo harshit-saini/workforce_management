@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { HierarchyNode } from "@/types";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 import OrgChartNode from "@/components/OrgChartNode";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 function flatten(nodes: HierarchyNode[]): HierarchyNode[] {
   return nodes.flatMap((n) => [n, ...flatten(n.reports)]);
@@ -15,10 +16,11 @@ export default function HierarchyPage() {
   const [departmentId, setDepartmentId] = useState("");
   const [highlightId, setHighlightId] = useState<string | undefined>();
 
-  const { data: tree } = useQuery({
+  const treeQuery = useQuery({
     queryKey: ["hierarchy-tree"],
     queryFn: async () => (await api.get<HierarchyNode[]>("/hierarchy/tree")).data,
   });
+  const tree = treeQuery.data;
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
 
@@ -72,6 +74,17 @@ export default function HierarchyPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 overflow-x-auto">
+        {!tree &&
+          (treeQuery.isError ? (
+            <QueryError
+              title="Couldn't load the org chart"
+              error={treeQuery.error}
+              onRetry={() => treeQuery.refetch()}
+              retrying={treeQuery.isFetching}
+            />
+          ) : (
+            <LoadingText />
+          ))}
         {tree?.map((root) => (
           <OrgChartNode key={root.id} node={root} highlightId={highlightId} matchesFilter={matchesFilter} />
         ))}

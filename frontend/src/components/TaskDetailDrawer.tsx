@@ -1,6 +1,6 @@
 import { useRef, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
 import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachment } from "@/types";
 import TaskFormModal from "@/components/TaskFormModal";
@@ -11,6 +11,8 @@ import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
 import { IconPlus, IconUpload, IconX } from "@/components/icons";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
+import { getErrorMessage } from "@/lib/errors";
+import QueryError from "@/components/QueryError";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
@@ -51,10 +53,11 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: task } = useQuery({
+  const taskQuery = useQuery({
     queryKey: ["task", taskId],
     queryFn: async () => (await api.get<Task>(`/tasks/${taskId}`)).data,
   });
+  const task = taskQuery.data;
 
   const { data: activity } = useQuery({
     queryKey: ["task-activity", taskId],
@@ -77,21 +80,29 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   }
 
   const addComment = useMutation({
-    mutationFn: () =>
-      api.post(`/tasks/${taskId}/comments`, {
-        comment,
-        statusChangedTo: statusChangedTo || undefined,
-      }),
+    mutationFn: (vars: { comment: string; statusChangedTo?: TaskStatus }) => api.post(`/tasks/${taskId}/comments`, vars),
     onSuccess: () => {
       setComment("");
       setStatusChangedTo("");
       invalidate();
     },
+    meta: {
+      successMessage: (_: unknown, vars: { statusChangedTo?: TaskStatus }) =>
+        vars.statusChangedTo ? `Moved to ${statusLabel(vars.statusChangedTo)}` : "Comment added",
+      errorTitle: (vars: { statusChangedTo?: TaskStatus }) =>
+        vars.statusChangedTo ? "Couldn't change status" : "Couldn't post comment",
+    },
   });
 
   const logTime = useMutation({
-    mutationFn: () => api.post(`/tasks/${taskId}/log`, { date: logDate, hoursLogged: Number(logHours) }),
+    // Hours/date are passed in (not read from state) so "Log full day" logs exactly what it says.
+    mutationFn: (vars: { date: string; hoursLogged: number }) => api.post(`/tasks/${taskId}/log`, vars),
     onSuccess: invalidate,
+    meta: {
+      successMessage: (_: unknown, vars: { date: string; hoursLogged: number }) =>
+        `Logged ${vars.hoursLogged}h on ${format(new Date(`${vars.date}T00:00:00`), "MMM d")}`,
+      errorTitle: "Couldn't log time",
+    },
   });
 
   const uploadAttachment = useMutation({
@@ -101,6 +112,10 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
       return api.post(`/tasks/${taskId}/attachments`, form, { headers: { "Content-Type": "multipart/form-data" } });
     },
     onSuccess: invalidate,
+    meta: {
+      successMessage: (_: unknown, file: File) => `Uploaded ${file.name}`,
+      errorTitle: (file: File) => `Couldn't upload ${file.name}`,
+    },
   });
 
   const saveEdit = useMutation({
@@ -119,12 +134,13 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
       setIsEditing(false);
       invalidate();
     },
+    meta: { successMessage: "Task updated", suppressErrorToast: true },
   });
 
   async function onCommentSubmit(e: FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
-    addComment.mutate();
+    addComment.mutate({ comment, statusChangedTo: statusChangedTo || undefined });
   }
 
   function startEditing() {
@@ -138,13 +154,36 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     if (editForm) saveEdit.mutate(editForm);
   }
 
-  if (!task) return null;
+  if (!task) {
+    // Open the drawer straight away so the click registers, then show loading or the failure.
+    return (
+      <div className="fixed inset-0 z-40 flex justify-end">
+        <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700" aria-label="Close">
+            <IconX className="w-5 h-5" />
+          </button>
+          {taskQuery.isError ? (
+            <QueryError
+              className="mt-10"
+              title="Couldn't load this task"
+              error={taskQuery.error}
+              onRetry={() => taskQuery.refetch()}
+              retrying={taskQuery.isFetching}
+            />
+          ) : (
+            <div className="text-sm text-gray-400 mt-1">Loading task…</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700" aria-label="Close">
           <IconX className="w-5 h-5" />
         </button>
 
@@ -269,7 +308,9 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 />
               </label>
             </div>
-            {saveEdit.isError && <p className="text-xs text-red-600 mb-2">Could not save changes.</p>}
+            {saveEdit.isError && (
+              <p className="text-xs text-red-600 mb-2">Couldn't save changes: {getErrorMessage(saveEdit.error)}</p>
+            )}
             <div className="flex gap-2">
               <button type="submit" disabled={saveEdit.isPending} className={btnPrimary}>
                 Save
@@ -350,14 +391,19 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-20"
             />
             <span className="text-xs text-gray-400">hours</span>
-            <button onClick={() => logTime.mutate()} disabled={logTime.isPending} className={btnSecondary}>
+            <button
+              onClick={() => logTime.mutate({ date: logDate, hoursLogged: Number(logHours) })}
+              disabled={logTime.isPending}
+              className={btnSecondary}
+            >
               Log
             </button>
             <button
               onClick={() => {
                 setLogHours("8");
-                logTime.mutate();
+                logTime.mutate({ date: logDate, hoursLogged: 8 });
               }}
+              disabled={logTime.isPending}
               className={btnSecondary}
             >
               Log full day (8h)

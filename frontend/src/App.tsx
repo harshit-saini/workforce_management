@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
+import Toaster from "@/components/Toaster";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
 import AcceptInvitePage from "@/pages/AcceptInvitePage";
@@ -28,6 +29,15 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
+  return (
+    <>
+      <AppRoutes />
+      <Toaster />
+    </>
+  );
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

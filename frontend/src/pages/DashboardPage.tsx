@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format, formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
 import { OverviewResult } from "@/types";
 import DateRangePicker, { RangeValue } from "@/components/DateRangePicker";
 import StatCard from "@/components/StatCard";
+import QueryError, { LoadingText } from "@/components/QueryError";
 import { useAuth } from "@/context/AuthContext";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 
@@ -18,8 +19,9 @@ export default function DashboardPage() {
 
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
+  const rangeReady = range.preset !== "custom" || !!(range.startDate && range.endDate);
 
-  const { data, isLoading } = useQuery({
+  const overviewQuery = useQuery({
     queryKey: ["overview", range, centerId, departmentId],
     queryFn: async () => {
       const params: Record<string, string> = { preset: range.preset };
@@ -32,8 +34,10 @@ export default function DashboardPage() {
       const { data } = await api.get<OverviewResult>("/overview", { params });
       return data;
     },
-    enabled: range.preset !== "custom" || !!(range.startDate && range.endDate),
+    enabled: rangeReady,
+    placeholderData: keepPreviousData,
   });
+  const { data } = overviewQuery;
 
   return (
     <div className="space-y-6">
@@ -63,8 +67,19 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isLoading || !data ? (
-        <div className="text-gray-400 text-sm">Loading…</div>
+      {!data ? (
+        overviewQuery.isError ? (
+          <QueryError
+            title="Couldn't load the overview"
+            error={overviewQuery.error}
+            onRetry={() => overviewQuery.refetch()}
+            retrying={overviewQuery.isFetching}
+          />
+        ) : !rangeReady ? (
+          <LoadingText label="Pick a start and end date to see the overview." />
+        ) : (
+          <LoadingText />
+        )
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

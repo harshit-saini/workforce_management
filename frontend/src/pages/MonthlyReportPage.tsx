@@ -1,21 +1,24 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { MonthlyReport } from "@/types";
 import StatCard from "@/components/StatCard";
 import ReportTaskList from "@/components/ReportTaskList";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 export default function MonthlyReportPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
-  const { data: report } = useQuery({
+  const reportQuery = useQuery({
     queryKey: ["monthly-report", "self", month, year],
     queryFn: async () => (await api.get<MonthlyReport>("/reports/monthly", { params: { month, year } })).data,
+    placeholderData: keepPreviousData,
   });
+  const report = reportQuery.data;
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -32,6 +35,18 @@ export default function MonthlyReportPage() {
           <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-24" />
         </div>
       </div>
+
+      {!report &&
+        (reportQuery.isError ? (
+          <QueryError
+            title="Couldn't load your monthly report"
+            error={reportQuery.error}
+            onRetry={() => reportQuery.refetch()}
+            retrying={reportQuery.isFetching}
+          />
+        ) : (
+          <LoadingText />
+        ))}
 
       {report && (
         <>

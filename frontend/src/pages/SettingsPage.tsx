@@ -1,11 +1,14 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { Organization, StatusCategory, TaskStatusOption } from "@/types";
 import { useTaskStatuses } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -16,7 +19,8 @@ const categoryLabel: Record<StatusCategory, string> = {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { data: statuses } = useTaskStatuses();
+  const statusesQuery = useTaskStatuses();
+  const statuses = statusesQuery.data;
   const [showAdd, setShowAdd] = useState(false);
 
   const { data: org } = useQuery({
@@ -31,7 +35,12 @@ export default function SettingsPage() {
   const saveOrg = useMutation({
     mutationFn: () => api.patch("/settings/organization", { name: orgName }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["organization"] }),
+    meta: { successMessage: "Organization name saved", errorTitle: "Couldn't save the organization name" },
   });
+
+  function statusName(id: string) {
+    return statuses?.find((s) => s.id === id)?.label ?? "status";
+  }
 
   function invalidateStatuses() {
     queryClient.invalidateQueries({ queryKey: ["task-statuses"] });
@@ -46,17 +55,28 @@ export default function SettingsPage() {
       data: Partial<Pick<TaskStatusOption, "label" | "category" | "color" | "isDefault" | "isRecurringDefault">>;
     }) => api.patch(`/settings/task-statuses/${id}`, data),
     onSuccess: invalidateStatuses,
+    // Re-sync so the controls go back to the saved value; the toast says why.
+    onError: invalidateStatuses,
+    meta: {
+      successMessage: (_: unknown, v: { id: string; data: { label?: string } }) =>
+        `Saved "${v.data.label ?? statusName(v.id)}"`,
+      errorTitle: (v: { id: string }) => `Couldn't update "${statusName(v.id)}"`,
+    },
   });
 
   const deleteStatus = useMutation({
     mutationFn: (id: string) => api.delete(`/settings/task-statuses/${id}`),
     onSuccess: invalidateStatuses,
-    onError: (err: any) => alert(err?.response?.data?.message ?? "Could not delete status"),
+    meta: {
+      successMessage: (_: unknown, id: string) => `Deleted "${statusName(id)}"`,
+      errorTitle: (id: string) => `Couldn't delete "${statusName(id)}"`,
+    },
   });
 
   const reorder = useMutation({
     mutationFn: (order: { id: string; order: number }[]) => api.post("/settings/task-statuses/reorder", { order }),
     onSuccess: invalidateStatuses,
+    meta: { errorTitle: "Couldn't reorder statuses" },
   });
 
   function moveStatus(index: number, direction: -1 | 1) {
@@ -107,6 +127,18 @@ export default function SettingsPage() {
           <span>Ongoing</span>
           <span></span>
         </div>
+
+        {!statuses &&
+          (statusesQuery.isError ? (
+            <QueryError
+              title="Couldn't load task statuses"
+              error={statusesQuery.error}
+              onRetry={() => statusesQuery.refetch()}
+              retrying={statusesQuery.isFetching}
+            />
+          ) : (
+            <LoadingText />
+          ))}
 
         <div className="divide-y divide-gray-100">
           {statuses?.map((s, i) => (
@@ -201,10 +233,11 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
     setSubmitting(true);
     try {
       await api.post("/settings/task-statuses", { label, category, color });
+      toast.success(`Status "${label}" added`);
       onCreated();
       onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Failed to create status");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create status"));
     } finally {
       setSubmitting(false);
     }

@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply } from "fastify";
 import { AppError } from "../../lib/errors.js";
+import { discardUpload, readUpload } from "../../lib/uploads.js";
 import { exportTasksQuerySchema, importRowsBodySchema } from "./tasks.schemas.js";
 import * as importService from "./taskImport.service.js";
 
@@ -33,10 +34,10 @@ export default async function taskImportRoutes(fastify: FastifyInstance) {
     const file = await request.file({ limits: { fileSize: MAX_IMPORT_FILE_BYTES, files: 1 } });
     if (!file) throw AppError.badRequest("No file provided");
     if (!file.filename.toLowerCase().endsWith(".xlsx")) {
+      await discardUpload(file);
       throw AppError.badRequest("Upload an .xlsx file (Excel 2007 or later).");
     }
-    // toBuffer() rejects with a 413 once the size limit is exceeded.
-    const buffer = await file.toBuffer();
+    const buffer = await readUpload(file, MAX_IMPORT_FILE_BYTES);
     return importService.previewImport(request.authUser.organizationId, buffer);
   });
 

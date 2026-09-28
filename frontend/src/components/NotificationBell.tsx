@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { IconBell } from "@/components/icons";
@@ -10,7 +12,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey: ["notifications", "bell"],
     queryFn: async () => {
       const { data } = await api.get<Paginated<Notification> & { unreadCount: number }>("/notifications", {
@@ -19,11 +21,17 @@ export default function NotificationBell() {
       return data;
     },
     refetchInterval: 30_000,
+    // Polling shouldn't toast every 30s while offline; the dropdown says so instead.
+    meta: { silentRefetchErrors: true },
   });
 
   async function markRead(id: string) {
-    await api.patch(`/notifications/${id}/read`);
-    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (err) {
+      toast.error("Couldn't mark the notification as read", { description: getErrorMessage(err) });
+    }
   }
 
   return (
@@ -59,6 +67,8 @@ export default function NotificationBell() {
                   </div>
                 </button>
               ))
+            ) : isError ? (
+              <div className="p-4 text-sm text-red-600">Couldn't load notifications. We'll keep trying.</div>
             ) : (
               <div className="p-4 text-sm text-gray-400">No notifications yet</div>
             )}
