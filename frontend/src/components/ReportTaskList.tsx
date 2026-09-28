@@ -1,5 +1,7 @@
 import { format } from "date-fns";
 import clsx from "clsx";
+import { Link } from "react-router-dom";
+import { taskHref } from "@/lib/links";
 import { ReportTaskSummary } from "@/types";
 import PriorityBadge from "@/components/PriorityBadge";
 import { IconCalendar } from "@/components/icons";
@@ -31,22 +33,27 @@ export default function ReportTaskList({
           {tasks.map((t) => {
             const date = t[dateField];
             return (
-              <li key={t.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-                <span className="text-gray-800 truncate">{t.title}</span>
-                <span className="flex items-center gap-2 shrink-0">
-                  <PriorityBadge priority={t.priority} />
-                  {date && (
-                    <span
-                      className={clsx(
-                        "inline-flex items-center gap-1 text-xs",
-                        overdue ? "text-red-600 font-medium" : "text-gray-400"
-                      )}
-                    >
-                      <IconCalendar className="w-3.5 h-3.5" />
-                      {format(new Date(date), "MMM d")}
-                    </span>
-                  )}
-                </span>
+              <li key={t.id}>
+                <Link
+                  to={taskHref(t.id)}
+                  className="py-2 px-2 -mx-2 rounded-md flex items-center justify-between gap-3 text-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+                >
+                  <span className="text-gray-800 truncate">{t.title}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <PriorityBadge priority={t.priority} />
+                    {date && (
+                      <span
+                        className={clsx(
+                          "inline-flex items-center gap-1 text-xs",
+                          overdue ? "text-red-600 font-medium" : "text-gray-400"
+                        )}
+                      >
+                        <IconCalendar className="w-3.5 h-3.5" />
+                        {format(new Date(date), "MMM d")}
+                      </span>
+                    )}
+                  </span>
+                </Link>
               </li>
             );
           })}

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { useUsersList } from "@/hooks/useLookups";
 import { api } from "@/lib/api";
 import { WeeklyReport } from "@/types";
 import StatCard from "@/components/StatCard";
@@ -11,11 +14,20 @@ import { btnPrimary } from "@/lib/ui";
 export default function WeeklyReportPage() {
   const [summary, setSummary] = useState("");
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  // ?userId= lets managers open a team member's report from Team Weekly (read-only).
+  const [params] = useSearchParams();
+  const requestedUserId = params.get("userId");
+  const viewingOther = !!requestedUserId && requestedUserId !== user?.id;
+  const { data: users } = useUsersList();
+  const subjectName = viewingOther ? users?.items.find((u) => u.id === requestedUserId)?.name ?? "Team member" : null;
 
   const reportQuery = useQuery({
-    queryKey: ["weekly-report", "self"],
+    queryKey: ["weekly-report", viewingOther ? requestedUserId : "self"],
     queryFn: async () => {
-      const { data } = await api.get<WeeklyReport>("/reports/weekly");
+      const { data } = await api.get<WeeklyReport>("/reports/weekly", {
+        params: { userId: viewingOther ? requestedUserId : undefined },
+      });
       setSummary(data.summary ?? "");
       return data;
     },
@@ -31,7 +43,7 @@ export default function WeeklyReportPage() {
   if (!report) {
     return reportQuery.isError ? (
       <QueryError
-        title="Couldn't load your weekly report"
+        title={viewingOther ? "Couldn't load this weekly report" : "Couldn't load your weekly report"}
         error={reportQuery.error}
         onRetry={() => reportQuery.refetch()}
         retrying={reportQuery.isFetching}
@@ -43,9 +55,14 @@ export default function WeeklyReportPage() {
 
   return (
     <div className="space-y-4 max-w-2xl">
+      {viewingOther && (
+        <Link to="/reports/weekly/team" className="text-xs text-brand-600 hover:underline">
+          ← Team weekly reports
+        </Link>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">
-          Weekly Report — {format(new Date(report.weekStartDate), "MMM d")} to {format(new Date(report.weekEndDate), "MMM d")}
+          {subjectName ? `${subjectName}'s weekly report` : "Weekly Report"} — {format(new Date(report.weekStartDate), "MMM d")} to {format(new Date(report.weekEndDate), "MMM d")}
         </h1>
         <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">{report.status}</span>
       </div>
@@ -77,10 +94,10 @@ export default function WeeklyReportPage() {
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
           rows={5}
           value={summary}
-          disabled={report.status !== "DRAFT" && report.status !== "CHANGES_REQUESTED"}
+          disabled={viewingOther || (report.status !== "DRAFT" && report.status !== "CHANGES_REQUESTED")}
           onChange={(e) => setSummary(e.target.value)}
         />
-        {(report.status === "DRAFT" || report.status === "CHANGES_REQUESTED") && (
+        {!viewingOther && (report.status === "DRAFT" || report.status === "CHANGES_REQUESTED") && (
           <button onClick={() => submit.mutate()} disabled={submit.isPending} className={`mt-3 ${btnPrimary}`}>
             {submit.isPending ? "Submitting…" : "Submit report"}
           </button>

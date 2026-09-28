@@ -51,7 +51,12 @@ export async function buildTaskListWhere(
 ): Promise<Prisma.TaskWhereInput> {
   return {
     organizationId,
-    AND: [scopeWhere(accessibleUserIds)],
+    AND: [
+      scopeWhere(accessibleUserIds),
+      ...(query.statusCategory
+        ? [{ status: { in: await getStatusKeysByCategory(organizationId, query.statusCategory) } }]
+        : []),
+    ],
     ...(query.status ? { status: query.status } : {}),
     ...(query.priority ? { priority: query.priority } : {}),
     ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
@@ -212,7 +217,8 @@ export async function updateTask(
   const { tags, watcherIds, ...rest } = input;
 
   const data: Prisma.TaskUpdateInput = { ...rest };
-  if (rest.status && rest.status !== existing.status) {
+  const statusChanged = !!rest.status && rest.status !== existing.status;
+  if (rest.status && statusChanged) {
     await assertValidStatusKey(organizationId, rest.status);
     const [newCategory, oldCategory] = await Promise.all([
       getStatusCategory(organizationId, rest.status),
@@ -220,6 +226,10 @@ export async function updateTask(
     ]);
     if (newCategory === "DONE" && oldCategory !== "DONE") data.completedAt = new Date();
     if (oldCategory === "DONE" && newCategory !== "DONE") data.completedAt = null;
+    // A reason only makes sense while the task is blocked.
+    if (oldCategory === "BLOCKED" && newCategory !== "BLOCKED" && rest.blockedReason === undefined) {
+      data.blockedReason = null;
+    }
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -233,6 +243,28 @@ export async function updateTask(
     }
 
     const task = await tx.task.update({ where: { id: taskId }, data, include: taskInclude });
+
+    // Board drags and the drawer's status picker both land here, so this is the one place
+    // status history gets recorded for them (comments with a status change log their own).
+    if (statusChanged) {
+      const labels = new Map(
+        (await tx.taskStatusOption.findMany({
+          where: { organizationId, key: { in: [existing.status, rest.status!] } },
+          select: { key: true, label: true },
+        })).map((o) => [o.key, o.label])
+      );
+      const reason = rest.blockedReason?.trim();
+      await tx.taskActivity.create({
+        data: {
+          taskId,
+          userId: actor.id,
+          type: "STATUS_CHANGE",
+          message: `Moved from ${labels.get(existing.status) ?? existing.status} to ${labels.get(rest.status!) ?? rest.status}${
+            reason ? ` — ${reason}` : ""
+          }`,
+        },
+      });
+    }
 
     if (input.assigneeId !== undefined && input.assigneeId !== existing.assigneeId) {
       await tx.taskActivity.create({
@@ -263,7 +295,7 @@ export async function updateTask(
         });
       }
     } else {
-      const changedFields = Object.keys(rest).filter((k) => k !== "status");
+      const changedFields = Object.keys(rest).filter((k) => k !== "status" && !(statusChanged && k === "blockedReason"));
       if (changedFields.length > 0) {
         await tx.taskActivity.create({
           data: { taskId, userId: actor.id, type: "EDITED", message: `Updated ${changedFields.join(", ")}` },
@@ -342,22 +374,30 @@ export async function logTime(
 ) {
   await getTaskOrThrow(organizationId, accessibleUserIds, taskId);
 
+  const key = { taskId_userId_date: { taskId, userId: actor.id, date: input.date } };
+  const previous = await prisma.taskLog.findUnique({ where: key, select: { hoursLogged: true } });
+
+  // One entry per person per day: logging the same day again replaces that day's hours,
+  // so the history says so instead of reading as if the hours added up.
   const log = await prisma.taskLog.upsert({
-    where: { taskId_userId_date: { taskId, userId: actor.id, date: input.date } },
+    where: key,
     update: { hoursLogged: input.hoursLogged, note: input.note },
     create: { taskId, userId: actor.id, date: input.date, hoursLogged: input.hoursLogged, note: input.note },
   });
 
+  const day = input.date.toISOString().slice(0, 10);
   await prisma.taskActivity.create({
     data: {
       taskId,
       userId: actor.id,
       type: "TIME_LOGGED",
-      message: `Logged ${input.hoursLogged}h on ${input.date.toISOString().slice(0, 10)}`,
+      message: previous
+        ? `Changed hours on ${day} from ${Number(previous.hoursLogged)}h to ${input.hoursLogged}h`
+        : `Logged ${input.hoursLogged}h on ${day}`,
     },
   });
 
-  return log;
+  return { ...log, previousHours: previous ? Number(previous.hoursLogged) : null };
 }
 
 export async function getActivity(organizationId: string, accessibleUserIds: string[] | null, taskId: string) {

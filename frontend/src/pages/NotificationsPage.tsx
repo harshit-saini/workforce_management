@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { notificationHref } from "@/lib/links";
 import { api } from "@/lib/api";
 import { Notification, NotificationType, Paginated } from "@/types";
 import QueryError, { LoadingText } from "@/components/QueryError";
@@ -23,6 +25,7 @@ interface Preference {
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const notificationsQuery = useQuery({
     queryKey: ["notifications", "all"],
@@ -86,7 +89,11 @@ export default function NotificationsPage() {
           {data?.items.map((n) => (
             <button
               key={n.id}
-              onClick={() => !n.isRead && markRead.mutate(n.id)}
+              onClick={() => {
+                if (!n.isRead) markRead.mutate(n.id);
+                const href = notificationHref(n);
+                if (href) navigate(href);
+              }}
               className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${n.isRead ? "text-gray-400" : "text-gray-800 font-medium"}`}
             >
               <div>{n.message}</div>

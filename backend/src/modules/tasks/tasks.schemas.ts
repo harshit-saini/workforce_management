@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TaskPriority } from "@prisma/client";
+import { StatusCategory, TaskPriority } from "@prisma/client";
 import { MAX_IMPORT_ROWS } from "./taskSheet.js";
 
 export const createTaskSchema = z.object({
@@ -40,6 +40,13 @@ export const listTasksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(500).default(25),
   status: z.string().optional(),
+  // Comma-separated categories, e.g. "BLOCKED" or "BACKLOG,ACTIVE,BLOCKED" — lets links like the
+  // dashboard's "Blocked" tile filter across every status the org maps to those categories.
+  statusCategory: z
+    .string()
+    .transform((v) => v.split(",").map((c) => c.trim()).filter(Boolean))
+    .pipe(z.array(z.nativeEnum(StatusCategory)).min(1))
+    .optional(),
   view: z.enum(["backlog", "board", "ongoing", "all"]).default("all"),
   priority: z.nativeEnum(TaskPriority).optional(),
   assigneeId: z.string().optional(),
