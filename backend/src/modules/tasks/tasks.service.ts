@@ -42,12 +42,14 @@ export function scopeWhere(accessibleUserIds: string[] | null): Prisma.TaskWhere
   };
 }
 
-export async function listTasks(
+export type TaskListFilters = Omit<z.infer<typeof listTasksQuerySchema>, "page" | "pageSize">;
+
+export async function buildTaskListWhere(
   organizationId: string,
   accessibleUserIds: string[] | null,
-  query: z.infer<typeof listTasksQuerySchema>
-) {
-  const where: Prisma.TaskWhereInput = {
+  query: TaskListFilters
+): Promise<Prisma.TaskWhereInput> {
+  return {
     organizationId,
     AND: [scopeWhere(accessibleUserIds)],
     ...(query.status ? { status: query.status } : {}),
@@ -75,6 +77,14 @@ export async function listTasks(
     ...(query.view === "ongoing" ? { isRecurring: true } : {}),
     ...(query.view === "board" ? { isRecurring: false } : {}),
   };
+}
+
+export async function listTasks(
+  organizationId: string,
+  accessibleUserIds: string[] | null,
+  query: z.infer<typeof listTasksQuerySchema>
+) {
+  const where = await buildTaskListWhere(organizationId, accessibleUserIds, query);
 
   const [items, total] = await Promise.all([
     prisma.task.findMany({

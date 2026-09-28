@@ -240,6 +240,48 @@ export interface HierarchyNode {
   reports: HierarchyNode[];
 }
 
+export type ImportField =
+  | "title"
+  | "description"
+  | "assigneeEmail"
+  | "center"
+  | "department"
+  | "status"
+  | "priority"
+  | "dueDate"
+  | "estimatedHours"
+  | "tags";
+
+/** One spreadsheet row as editable text; `rowNumber` is its row in the uploaded file. */
+export type ImportRow = { rowNumber: number } & Record<ImportField, string>;
+
+export interface ImportCellIssue {
+  field: ImportField;
+  /** "error" blocks the import; "warning" means a fallback value will be used. */
+  severity: "error" | "warning";
+  message: string;
+}
+
+export interface ImportRowResult {
+  rowNumber: number;
+  assigneeName: string | null;
+  issues: ImportCellIssue[];
+}
+
+export interface ImportValidation {
+  rows: ImportRowResult[];
+  summary: { total: number; errorRows: number; warningRows: number };
+}
+
+export interface ImportOptions {
+  users: { id: string; name: string; email: string }[];
+  centers: { id: string; name: string; code: string }[];
+  departments: { id: string; name: string }[];
+  statuses: { key: string; label: string; color: string }[];
+  priorities: { value: TaskPriority; label: string }[];
+  defaultStatus: { key: string; label: string };
+}
+
 export interface Paginated<T> {
   items: T[];
   meta: { total: number; page: number; pageSize: number; totalPages: number };
