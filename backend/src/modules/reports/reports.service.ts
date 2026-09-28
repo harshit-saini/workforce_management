@@ -136,6 +136,17 @@ export async function reviewWeeklyReport(
   });
 }
 
+/**
+ * Who a team rollup may include: the whole org for owners/admins, a manager's
+ * downline for managers. Anyone else has no team, so the rollup is forbidden
+ * (it would otherwise list every colleague's report status and numbers).
+ */
+export async function resolveTeamUserIds(organizationId: string, actor: AuthUser): Promise<string[] | null> {
+  if (actor.role === "OWNER" || actor.role === "ADMIN") return null;
+  if (actor.role === "MANAGER") return getDownlineUserIds(organizationId, actor.id);
+  throw AppError.forbidden("Only managers and admins can view team reports");
+}
+
 export async function weeklyTeamSummary(
   organizationId: string,
   actor: AuthUser,
@@ -143,11 +154,7 @@ export async function weeklyTeamSummary(
   centerId?: string
 ) {
   const weekStartDate = startOfWeek(anyDateInWeek);
-
-  let userIds: string[] | null = null;
-  if (actor.role === "MANAGER") {
-    userIds = await getDownlineUserIds(organizationId, actor.id);
-  }
+  const userIds = await resolveTeamUserIds(organizationId, actor);
 
   const users = await prisma.user.findMany({
     where: {
@@ -286,10 +293,7 @@ export async function monthlyTeamSummary(
   centerId?: string,
   departmentId?: string
 ) {
-  let userIds: string[] | null = null;
-  if (actor.role === "MANAGER") {
-    userIds = await getDownlineUserIds(organizationId, actor.id);
-  }
+  const userIds = await resolveTeamUserIds(organizationId, actor);
 
   const users = await prisma.user.findMany({
     where: {
