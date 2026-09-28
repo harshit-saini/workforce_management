@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
+import { downloadFromApi } from "@/lib/download";
 import { api } from "@/lib/api";
 import { Paginated, Task, TaskStatus } from "@/types";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
@@ -8,8 +11,8 @@ import KanbanBoard from "@/components/KanbanBoard";
 import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
-import { IconPlus, IconSearch } from "@/components/icons";
-import { btnPrimary } from "@/lib/ui";
+import { IconDownload, IconPlus, IconSearch, IconUpload } from "@/components/icons";
+import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 type Tab = "board" | "list" | "ongoing";
 
@@ -22,6 +25,10 @@ export default function TasksPage() {
   const search = useDebouncedValue(searchInput);
   const [showCreate, setShowCreate] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "OWNER" || user?.role === "ADMIN";
 
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
@@ -69,6 +76,19 @@ export default function TasksPage() {
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
   }
 
+  async function exportTasks() {
+    setExportError(null);
+    setExporting(true);
+    try {
+      const { pageSize: _pageSize, ...exportFilters } = filters;
+      await downloadFromApi("/tasks/export", `tasks-${new Date().toISOString().slice(0, 10)}.xlsx`, exportFilters);
+    } catch (err: any) {
+      setExportError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const tasks = data?.items ?? [];
 
   return (
@@ -90,10 +110,28 @@ export default function TasksPage() {
             ))}
           </div>
         </div>
-        <button onClick={() => setShowCreate(true)} className={btnPrimary}>
-          <IconPlus className="w-4 h-4" /> New task
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <Link to="/tasks/import" className={btnSecondary}>
+                <IconUpload className="w-4 h-4" /> Import
+              </Link>
+              <button
+                onClick={exportTasks}
+                disabled={exporting}
+                className={btnSecondary}
+                title="Download the tasks matching the current filters as an Excel file"
+              >
+                <IconDownload className="w-4 h-4" /> {exporting ? "Exporting…" : "Export"}
+              </button>
+            </>
+          )}
+          <button onClick={() => setShowCreate(true)} className={btnPrimary}>
+            <IconPlus className="w-4 h-4" /> New task
+          </button>
+        </div>
       </div>
+      {exportError && <p className="text-sm text-red-600">{exportError}</p>}
 
       <div className="flex flex-wrap gap-2">
         <div className="relative">

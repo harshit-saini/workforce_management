@@ -12,6 +12,7 @@ import UsersPage from "@/pages/UsersPage";
 import CentersPage from "@/pages/CentersPage";
 import DepartmentsPage from "@/pages/DepartmentsPage";
 import TasksPage from "@/pages/TasksPage";
+import TaskImportPage from "@/pages/TaskImportPage";
 import WeeklyReportPage from "@/pages/WeeklyReportPage";
 import WeeklyTeamReportPage from "@/pages/WeeklyTeamReportPage";
 import MonthlyReportPage from "@/pages/MonthlyReportPage";
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="centers" element={<CentersPage />} />
         <Route path="departments" element={<DepartmentsPage />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="tasks/import" element={<TaskImportPage />} />
         <Route path="reports/weekly" element={<WeeklyReportPage />} />
         <Route path="reports/weekly/team" element={<WeeklyTeamReportPage />} />
         <Route path="reports/monthly" element={<MonthlyReportPage />} />

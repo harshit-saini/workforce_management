@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TaskPriority } from "@prisma/client";
+import { MAX_IMPORT_ROWS } from "./taskSheet.js";
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -50,6 +51,33 @@ export const listTasksQuerySchema = z.object({
   search: z.string().optional(),
   parentTaskId: z.string().optional(),
   topLevelOnly: z.coerce.boolean().optional(),
+});
+
+export const exportTasksQuerySchema = listTasksQuerySchema.omit({ page: true, pageSize: true });
+
+// Cells are free text here on purpose — each value is checked against the org's data by
+// validateImportRow, which reports problems per cell instead of rejecting the whole request.
+const importCell = z.string().max(10_000).default("");
+
+export const importRowsBodySchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        rowNumber: z.number().int().min(1),
+        title: importCell,
+        description: importCell,
+        assigneeEmail: importCell,
+        center: importCell,
+        department: importCell,
+        status: importCell,
+        priority: importCell,
+        dueDate: importCell,
+        estimatedHours: importCell,
+        tags: importCell,
+      })
+    )
+    .min(1)
+    .max(MAX_IMPORT_ROWS),
 });
 
 export const addCommentSchema = z.object({

@@ -156,7 +156,11 @@ reassignment, comment+status-change activity log, time logging, file
 attachments with inline image/PDF previews), organization-configurable
 task statuses (Jira-style custom workflow — add/rename/recolor/reorder
 statuses from Settings, each mapped to a BACKLOG/ACTIVE/DONE/BLOCKED
-category that drives aggregation), the flexible-time-span overview
+category that drives aggregation), admin bulk task import/export via
+Excel (downloadable template with in-file dropdowns, an editable preview
+grid that validates every cell against the org's users/centers/departments/
+statuses before anything is created, and filter-aware `.xlsx` export that
+can be edited and re-imported), the flexible-time-span overview
 dashboard, in-app + email-stub notifications with per-type/channel
 preferences and cron-driven reminders, weekly report generation/submission/
 review, monthly report generation with team rollups, an audit log for

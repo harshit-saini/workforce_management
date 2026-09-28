@@ -14,6 +14,7 @@ import centersRoutes from "./modules/centers/centers.routes.js";
 import departmentsRoutes from "./modules/departments/departments.routes.js";
 import hierarchyRoutes from "./modules/hierarchy/hierarchy.routes.js";
 import tasksRoutes from "./modules/tasks/tasks.routes.js";
+import taskImportRoutes from "./modules/tasks/taskImport.routes.js";
 import overviewRoutes from "./modules/overview/overview.routes.js";
 import notificationsRoutes from "./modules/notifications/notifications.routes.js";
 import reportsRoutes from "./modules/reports/reports.routes.js";
@@ -36,6 +37,7 @@ export function buildApp() {
   app.register(departmentsRoutes, { prefix: "/api" });
   app.register(hierarchyRoutes, { prefix: "/api" });
   app.register(tasksRoutes, { prefix: "/api" });
+  app.register(taskImportRoutes, { prefix: "/api" });
   app.register(overviewRoutes, { prefix: "/api" });
   app.register(notificationsRoutes, { prefix: "/api" });
   app.register(reportsRoutes, { prefix: "/api" });
