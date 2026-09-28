@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useCenters } from "@/hooks/useLookups";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 interface TeamRow {
   user: { id: string; name: string; email: string };
@@ -23,16 +24,24 @@ export default function WeeklyTeamReportPage() {
   const { data: centers } = useCenters();
   const queryClient = useQueryClient();
 
-  const { data } = useQuery({
+  const summaryQuery = useQuery({
     queryKey: ["weekly-team-summary", centerId],
     queryFn: async () =>
       (await api.get<TeamRow[]>("/reports/weekly/team-summary", { params: { centerId: centerId || undefined } })).data,
+    placeholderData: keepPreviousData,
   });
+  const { data } = summaryQuery;
 
+  type ReviewVars = { id: string; name: string; status: string; managerComment?: string };
   const review = useMutation({
-    mutationFn: ({ id, status, managerComment }: { id: string; status: string; managerComment?: string }) =>
+    mutationFn: ({ id, status, managerComment }: ReviewVars) =>
       api.post(`/reports/weekly/${id}/review`, { status, managerComment }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["weekly-team-summary"] }),
+    meta: {
+      successMessage: (_: unknown, v: ReviewVars) =>
+        v.status === "APPROVED" ? `Approved ${v.name}'s report` : `Sent ${v.name}'s report back for changes`,
+      errorTitle: (v: ReviewVars) => `Couldn't update ${v.name}'s report`,
+    },
   });
 
   return (
@@ -48,6 +57,18 @@ export default function WeeklyTeamReportPage() {
           ))}
         </select>
       </div>
+
+      {!data &&
+        (summaryQuery.isError ? (
+          <QueryError
+            title="Couldn't load team reports"
+            error={summaryQuery.error}
+            onRetry={() => summaryQuery.refetch()}
+            retrying={summaryQuery.isFetching}
+          />
+        ) : (
+          <LoadingText />
+        ))}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">
         {data?.map((row) => (
@@ -70,15 +91,17 @@ export default function WeeklyTeamReportPage() {
               {row.report && row.status === "SUBMITTED" && (
                 <>
                   <button
-                    onClick={() => review.mutate({ id: row.report!.id, status: "APPROVED" })}
+                    disabled={review.isPending}
+                    onClick={() => review.mutate({ id: row.report!.id, name: row.user.name, status: "APPROVED" })}
                     className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => {
-                      const comment = prompt("What changes are needed?") ?? "";
-                      review.mutate({ id: row.report!.id, status: "CHANGES_REQUESTED", managerComment: comment });
+                      const comment = prompt("What changes are needed?");
+                      if (comment === null) return; // cancelled
+                      review.mutate({ id: row.report!.id, name: row.user.name, status: "CHANGES_REQUESTED", managerComment: comment });
                     }}
                     className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
                   >

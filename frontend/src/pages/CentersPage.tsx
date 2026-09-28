@@ -1,12 +1,16 @@
 import { useState, FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { useCenters } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import StatCard from "@/components/StatCard";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 export default function CentersPage() {
-  const { data: centers } = useCenters();
+  const centersQuery = useCenters();
+  const centers = centersQuery.data;
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -14,13 +18,24 @@ export default function CentersPage() {
   const toggleActive = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => api.patch(`/centers/${id}`, { isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["centers"] }),
+    meta: {
+      successMessage: (_: unknown, v: { id: string; isActive: boolean }) =>
+        `${centerName(v.id)} ${v.isActive ? "activated" : "deactivated"}`,
+      errorTitle: (v: { id: string }) => `Couldn't update ${centerName(v.id)}`,
+    },
   });
 
-  const { data: dashboard } = useQuery({
+  function centerName(id: string) {
+    return centers?.find((c) => c.id === id)?.name ?? "Center";
+  }
+
+  const dashboardQuery = useQuery({
     queryKey: ["center-dashboard", selected],
     queryFn: async () => (await api.get(`/centers/${selected}/dashboard`, { params: { preset: "this_week" } })).data,
     enabled: !!selected,
+    placeholderData: keepPreviousData,
   });
+  const dashboard = dashboardQuery.data;
 
   return (
     <div className="space-y-4">
@@ -30,6 +45,18 @@ export default function CentersPage() {
           Add center
         </button>
       </div>
+
+      {!centers &&
+        (centersQuery.isError ? (
+          <QueryError
+            title="Couldn't load centers"
+            error={centersQuery.error}
+            onRetry={() => centersQuery.refetch()}
+            retrying={centersQuery.isFetching}
+          />
+        ) : (
+          <LoadingText />
+        ))}
 
       <div className="grid md:grid-cols-2 gap-4">
         {centers?.map((c) => (
@@ -60,6 +87,15 @@ export default function CentersPage() {
           </button>
         ))}
       </div>
+
+      {selected && !dashboard && dashboardQuery.isError && (
+        <QueryError
+          title="Couldn't load this center's dashboard"
+          error={dashboardQuery.error}
+          onRetry={() => dashboardQuery.refetch()}
+          retrying={dashboardQuery.isFetching}
+        />
+      )}
 
       {selected && dashboard && (
         <div className="space-y-3">
@@ -93,9 +129,10 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
     try {
       await api.post("/centers", { name, code, address: address || undefined, timezone });
       queryClient.invalidateQueries({ queryKey: ["centers"] });
+      toast.success(`Center "${name}" created`);
       onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Failed to create center");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create center"));
     }
   }
 

@@ -2,18 +2,26 @@ import { useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { Invite, Role } from "@/types";
 import { useUsersList, useCenters, useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import Avatar from "@/components/Avatar";
+import QueryError, { LoadingText } from "@/components/QueryError";
 import { IconPlus } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 
 const roles: Role[] = ["ADMIN", "MANAGER", "EMPLOYEE"];
 
+const roleLabel: Record<Role, string> = { OWNER: "Owner", ADMIN: "Admin", MANAGER: "Manager", EMPLOYEE: "Employee" };
+const statusLabel: Record<string, string> = { ACTIVE: "Active", INACTIVE: "Inactive", ON_LEAVE: "On leave" };
+const fieldLabel: Record<string, string> = { centerId: "center", departmentId: "department", managerId: "manager" };
+
 export default function UsersPage() {
   const [showInvite, setShowInvite] = useState(false);
-  const { data, refetch } = useUsersList();
+  const usersQuery = useUsersList();
+  const { data } = usersQuery;
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const queryClient = useQueryClient();
@@ -23,29 +31,64 @@ export default function UsersPage() {
     queryFn: async () => (await api.get<Invite[]>("/users/invites")).data,
   });
 
+  const userName = (id: string) => data?.items.find((u) => u.id === id)?.name ?? "User";
+  const inviteEmail = (id: string) => invites?.find((i) => i.id === id)?.email ?? "invite";
+
   const resendInvite = useMutation({
     mutationFn: (id: string) => api.post(`/users/invites/${id}/resend`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
+    meta: {
+      successMessage: (_: unknown, id: string) => `Invite resent to ${inviteEmail(id)}`,
+      errorTitle: (id: string) => `Couldn't resend the invite to ${inviteEmail(id)}`,
+    },
   });
 
   const cancelInvite = useMutation({
     mutationFn: (id: string) => api.delete(`/users/invites/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
+    meta: {
+      successMessage: (_: unknown, id: string) => `Invite to ${inviteEmail(id)} cancelled`,
+      errorTitle: "Couldn't cancel the invite",
+    },
   });
 
   const updateRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) => api.patch(`/users/${id}/role`, { role }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    meta: {
+      successMessage: (_: unknown, v: { id: string; role: Role }) => `${userName(v.id)} is now ${roleLabel[v.role]}`,
+      errorTitle: (v: { id: string }) => `Couldn't change ${userName(v.id)}'s role`,
+    },
   });
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/users/${id}/status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    meta: {
+      successMessage: (_: unknown, v: { id: string; status: string }) =>
+        `${userName(v.id)} marked ${statusLabel[v.status] ?? v.status}`,
+      errorTitle: (v: { id: string }) => `Couldn't change ${userName(v.id)}'s status`,
+    },
   });
 
   const updateFields = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => api.patch(`/users/${id}`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    meta: {
+      successMessage: (_: unknown, v: { id: string; data: Record<string, unknown> }) =>
+        `Updated ${userName(v.id)}'s ${fieldLabel[Object.keys(v.data)[0]] ?? "details"}`,
+      errorTitle: (v: { id: string; data: Record<string, unknown> }) =>
+        `Couldn't change ${userName(v.id)}'s ${fieldLabel[Object.keys(v.data)[0]] ?? "details"}`,
+    },
+  });
+
+  const removeUser = useMutation({
+    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    meta: {
+      successMessage: (_: unknown, id: string) => `${userName(id)} removed`,
+      errorTitle: (id: string) => `Couldn't remove ${userName(id)}`,
+    },
   });
 
   return (
@@ -57,126 +100,136 @@ export default function UsersPage() {
         </button>
       </div>
 
-      <div className={`${card} overflow-x-auto`}>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th className="text-left px-4 py-2">Name</th>
-              <th className="text-left px-4 py-2">Role</th>
-              <th className="text-left px-4 py-2">Center</th>
-              <th className="text-left px-4 py-2">Department</th>
-              <th className="text-left px-4 py-2">Manager</th>
-              <th className="text-left px-4 py-2">Status</th>
-              <th className="text-left px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.items.map((u) => (
-              <tr key={u.id} className="border-t border-gray-100">
-                <td className="px-4 py-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar name={u.name} size="sm" />
-                    <div>
-                      <div className="font-medium text-gray-800">{u.name}</div>
-                      <div className="text-xs text-gray-400">{u.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-2">
-                  {u.role === "OWNER" ? (
-                    "OWNER"
-                  ) : (
-                    <select
-                      value={u.role}
-                      onChange={(e) => updateRole.mutate({ id: u.id, role: e.target.value as Role })}
-                      className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-                    >
-                      {roles.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={u.centerId ?? ""}
-                    onChange={(e) => updateFields.mutate({ id: u.id, data: { centerId: e.target.value || null } })}
-                    className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-                  >
-                    <option value="">—</option>
-                    {centers?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={u.departmentId ?? ""}
-                    onChange={(e) => updateFields.mutate({ id: u.id, data: { departmentId: e.target.value || null } })}
-                    className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-                  >
-                    <option value="">—</option>
-                    {departments?.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={u.managerId ?? ""}
-                    onChange={(e) => updateFields.mutate({ id: u.id, data: { managerId: e.target.value || null } })}
-                    className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-                  >
-                    <option value="">—</option>
-                    {data?.items
-                      .filter((m) => m.id !== u.id)
-                      .map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  {u.role === "OWNER" ? (
-                    "ACTIVE"
-                  ) : (
-                    <select
-                      value={u.status}
-                      onChange={(e) => updateStatus.mutate({ id: u.id, status: e.target.value })}
-                      className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-                    >
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                      <option value="ON_LEAVE">On leave</option>
-                    </select>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  {u.role !== "OWNER" && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Remove ${u.name}?`)) {
-                          api.delete(`/users/${u.id}`).then(() => refetch());
-                        }
-                      }}
-                      className="text-red-600 text-xs hover:underline"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </td>
+      {usersQuery.isError && !data && (
+        <QueryError
+          title="Couldn't load users"
+          error={usersQuery.error}
+          onRetry={() => usersQuery.refetch()}
+          retrying={usersQuery.isFetching}
+        />
+      )}
+      {usersQuery.isPending && <LoadingText />}
+
+      {data && (
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="text-left px-4 py-2">Name</th>
+                <th className="text-left px-4 py-2">Role</th>
+                <th className="text-left px-4 py-2">Center</th>
+                <th className="text-left px-4 py-2">Department</th>
+                <th className="text-left px-4 py-2">Manager</th>
+                <th className="text-left px-4 py-2">Status</th>
+                <th className="text-left px-4 py-2">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {data?.items.map((u) => (
+                <tr key={u.id} className="border-t border-gray-100">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={u.name} size="sm" />
+                      <div>
+                        <div className="font-medium text-gray-800">{u.name}</div>
+                        <div className="text-xs text-gray-400">{u.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    {u.role === "OWNER" ? (
+                      "OWNER"
+                    ) : (
+                      <select
+                        value={u.role}
+                        onChange={(e) => updateRole.mutate({ id: u.id, role: e.target.value as Role })}
+                        className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                      >
+                        {roles.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={u.centerId ?? ""}
+                      onChange={(e) => updateFields.mutate({ id: u.id, data: { centerId: e.target.value || null } })}
+                      className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                    >
+                      <option value="">—</option>
+                      {centers?.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={u.departmentId ?? ""}
+                      onChange={(e) => updateFields.mutate({ id: u.id, data: { departmentId: e.target.value || null } })}
+                      className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                    >
+                      <option value="">—</option>
+                      {departments?.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={u.managerId ?? ""}
+                      onChange={(e) => updateFields.mutate({ id: u.id, data: { managerId: e.target.value || null } })}
+                      className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                    >
+                      <option value="">—</option>
+                      {data?.items
+                        .filter((m) => m.id !== u.id)
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    {u.role === "OWNER" ? (
+                      "ACTIVE"
+                    ) : (
+                      <select
+                        value={u.status}
+                        onChange={(e) => updateStatus.mutate({ id: u.id, status: e.target.value })}
+                        className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+                      >
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                        <option value="ON_LEAVE">On leave</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    {u.role !== "OWNER" && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Remove ${u.name}?`)) removeUser.mutate(u.id);
+                        }}
+                        className="text-red-600 text-xs hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {invites && invites.length > 0 && (
         <div className={card}>
@@ -241,11 +294,13 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [centerId, setCenterId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
     try {
       await api.post("/users/invite", {
         email,
@@ -254,10 +309,13 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         departmentId: departmentId || undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success(`Invite sent to ${email}`);
       onCreated();
       onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Failed to send invite");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to send invite"));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -301,8 +359,8 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             <button type="button" onClick={onClose} className={btnSecondary}>
               Cancel
             </button>
-            <button type="submit" className={btnPrimary}>
-              Send invite
+            <button type="submit" disabled={submitting} className={btnPrimary}>
+              {submitting ? "Sending…" : "Send invite"}
             </button>
           </div>
         </form>

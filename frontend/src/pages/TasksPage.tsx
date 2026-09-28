@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { downloadFromApi } from "@/lib/download";
+import { getErrorMessage } from "@/lib/errors";
+import { toast } from "@/lib/toast";
 import { api } from "@/lib/api";
 import { Paginated, Task, TaskStatus } from "@/types";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
@@ -11,6 +13,7 @@ import KanbanBoard from "@/components/KanbanBoard";
 import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
+import QueryError, { LoadingText } from "@/components/QueryError";
 import { IconDownload, IconPlus, IconSearch, IconUpload } from "@/components/icons";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 
@@ -26,7 +29,6 @@ export default function TasksPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
   const { user } = useAuth();
   const isAdmin = user?.role === "OWNER" || user?.role === "ADMIN";
 
@@ -46,10 +48,13 @@ export default function TasksPage() {
     pageSize: "200",
   };
 
-  const { data } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["tasks", filters],
     queryFn: async () => (await api.get<Paginated<Task>>("/tasks", { params: filters })).data,
+    // Keep the current board on screen while a new filter/tab loads instead of blanking it.
+    placeholderData: keepPreviousData,
   });
+  const { data } = tasksQuery;
 
   const tasksQueryKey = ["tasks", filters];
 
@@ -70,6 +75,12 @@ export default function TasksPage() {
       if (context?.previous) queryClient.setQueryData(tasksQueryKey, context.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    meta: {
+      errorTitle: ({ id }: { id: string }) => {
+        const title = data?.items.find((t) => t.id === id)?.title;
+        return title ? `Couldn't move "${title}"` : "Couldn't move task";
+      },
+    },
   });
 
   function refetchTasks() {
@@ -77,13 +88,13 @@ export default function TasksPage() {
   }
 
   async function exportTasks() {
-    setExportError(null);
     setExporting(true);
     try {
       const { pageSize: _pageSize, ...exportFilters } = filters;
       await downloadFromApi("/tasks/export", `tasks-${new Date().toISOString().slice(0, 10)}.xlsx`, exportFilters);
-    } catch (err: any) {
-      setExportError(err.message);
+      toast.success("Export downloaded");
+    } catch (err) {
+      toast.error("Export failed", { description: getErrorMessage(err) });
     } finally {
       setExporting(false);
     }
@@ -131,7 +142,6 @@ export default function TasksPage() {
           </button>
         </div>
       </div>
-      {exportError && <p className="text-sm text-red-600">{exportError}</p>}
 
       <div className="flex flex-wrap gap-2">
         <div className="relative">
@@ -169,7 +179,18 @@ export default function TasksPage() {
         </select>
       </div>
 
-      {tab === "board" && (
+      {tasksQuery.isError && !data ? (
+        <QueryError
+          title="Couldn't load tasks"
+          error={tasksQuery.error}
+          onRetry={() => tasksQuery.refetch()}
+          retrying={tasksQuery.isFetching}
+        />
+      ) : !data ? (
+        <LoadingText />
+      ) : null}
+
+      {data && tab === "board" && (
         <KanbanBoard
           statuses={boardStatuses}
           tasks={tasks}
@@ -177,9 +198,14 @@ export default function TasksPage() {
           onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
         />
       )}
-      {(tab === "list" || tab === "ongoing") && <TaskListTable tasks={tasks} onOpen={setOpenTaskId} />}
+      {data && (tab === "list" || tab === "ongoing") && <TaskListTable tasks={tasks} onOpen={setOpenTaskId} />}
 
-      {showCreate && <TaskFormModal onClose={() => setShowCreate(false)} onCreated={refetchTasks} defaultRecurring={tab === "ongoing"} />}
+      {showCreate && <TaskFormModal
+          onClose={() => setShowCreate(false)}
+          onCreated={refetchTasks}
+          onOpenCreated={setOpenTaskId}
+          defaultRecurring={tab === "ongoing"}
+        />}
       {openTaskId && <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
     </div>
   );

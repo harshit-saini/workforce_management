@@ -5,13 +5,14 @@ import { api } from "@/lib/api";
 import { WeeklyReport } from "@/types";
 import StatCard from "@/components/StatCard";
 import ReportTaskList from "@/components/ReportTaskList";
+import QueryError, { LoadingText } from "@/components/QueryError";
 import { btnPrimary } from "@/lib/ui";
 
 export default function WeeklyReportPage() {
   const [summary, setSummary] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: report } = useQuery({
+  const reportQuery = useQuery({
     queryKey: ["weekly-report", "self"],
     queryFn: async () => {
       const { data } = await api.get<WeeklyReport>("/reports/weekly");
@@ -19,13 +20,26 @@ export default function WeeklyReportPage() {
       return data;
     },
   });
+  const report = reportQuery.data;
 
   const submit = useMutation({
     mutationFn: () => api.post(`/reports/weekly/${report!.id}/submit`, { summary }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["weekly-report"] }),
+    meta: { successMessage: "Weekly report submitted", errorTitle: "Couldn't submit your report" },
   });
 
-  if (!report) return <div className="text-gray-400 text-sm">Loading…</div>;
+  if (!report) {
+    return reportQuery.isError ? (
+      <QueryError
+        title="Couldn't load your weekly report"
+        error={reportQuery.error}
+        onRetry={() => reportQuery.refetch()}
+        retrying={reportQuery.isFetching}
+      />
+    ) : (
+      <LoadingText />
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -68,7 +82,7 @@ export default function WeeklyReportPage() {
         />
         {(report.status === "DRAFT" || report.status === "CHANGES_REQUESTED") && (
           <button onClick={() => submit.mutate()} disabled={submit.isPending} className={`mt-3 ${btnPrimary}`}>
-            Submit report
+            {submit.isPending ? "Submitting…" : "Submit report"}
           </button>
         )}
         {report.managerComment && (

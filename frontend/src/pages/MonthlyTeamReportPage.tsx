@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 import StatCard from "@/components/StatCard";
+import QueryError, { LoadingText } from "@/components/QueryError";
 
 interface TeamSummary {
   avgCompletionRate: number;
@@ -21,7 +22,7 @@ export default function MonthlyTeamReportPage() {
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
 
-  const { data } = useQuery({
+  const summaryQuery = useQuery({
     queryKey: ["monthly-team-summary", month, year, centerId, departmentId],
     queryFn: async () =>
       (
@@ -29,7 +30,9 @@ export default function MonthlyTeamReportPage() {
           params: { month, year, centerId: centerId || undefined, departmentId: departmentId || undefined },
         })
       ).data,
+    placeholderData: keepPreviousData,
   });
+  const { data } = summaryQuery;
 
   return (
     <div className="space-y-4">
@@ -62,6 +65,18 @@ export default function MonthlyTeamReportPage() {
           </select>
         </div>
       </div>
+
+      {!data &&
+        (summaryQuery.isError ? (
+          <QueryError
+            title="Couldn't load the team rollup"
+            error={summaryQuery.error}
+            onRetry={() => summaryQuery.refetch()}
+            retrying={summaryQuery.isFetching}
+          />
+        ) : (
+          <LoadingText />
+        ))}
 
       {data && (
         <>
