@@ -28,7 +28,7 @@ export default function DateRangePicker({ value, onChange }: { value: RangeValue
           key={p.value}
           onClick={() => onChange({ preset: p.value, startDate: start, endDate: end })}
           className={clsx(
-            "px-3 py-1.5 rounded-md text-sm border",
+            "min-h-10 md:min-h-0 px-3 py-1.5 rounded-md text-sm border",
             value.preset === p.value
               ? "bg-brand-600 text-white border-brand-600"
               : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"

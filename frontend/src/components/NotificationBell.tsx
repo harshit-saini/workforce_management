@@ -60,7 +60,7 @@ export default function NotificationBell() {
         aria-haspopup="true"
         aria-expanded={open}
         onClick={toggle}
-        className="relative rounded-full p-2 hover:bg-gray-100"
+        className="relative flex h-10 w-10 md:h-auto md:w-auto items-center justify-center rounded-full md:p-2 hover:bg-gray-100"
         aria-label="Notifications"
       >
         <IconBell className="w-5 h-5" />

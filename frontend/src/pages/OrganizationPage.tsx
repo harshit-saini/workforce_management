@@ -21,7 +21,7 @@ export default function OrganizationPage() {
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setParams(t.key === "centers" ? {} : { tab: t.key }, { replace: true })}
-            className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
+            className={`min-h-10 md:min-h-0 px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
               tab === t.key ? "border-brand-600 text-brand-700" : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >

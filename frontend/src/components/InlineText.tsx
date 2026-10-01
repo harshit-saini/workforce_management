@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 /** Looks like plain text until hovered or focused, so the panel reads as a page, not a form. */
 export const fieldClass =
-  "w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-gray-900 hover:border-gray-300 hover:bg-gray-50 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60";
+  "w-full max-md:min-h-10 rounded-md border border-transparent bg-transparent px-2 py-1 max-md:py-2 text-sm text-gray-900 hover:border-gray-300 hover:bg-gray-50 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60";
 
 /**
  * Text that edits where it stands: saves when you leave it or press Enter, Escape puts the old text back.

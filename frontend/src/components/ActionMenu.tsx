@@ -3,6 +3,7 @@ import { usePopover } from "@/hooks/usePopover";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { IconMoreHorizontal } from "@/components/icons";
+import { btnIcon } from "@/lib/ui";
 
 export interface ActionMenuItem {
   label: string;
@@ -54,7 +55,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+        className={btnIcon}
       >
         <IconMoreHorizontal className="w-5 h-5" />
       </button>
@@ -77,7 +78,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
                   item.onSelect();
                 }}
                 className={clsx(
-                  "block w-full text-left px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed",
+                  "block w-full text-left px-3 py-2.5 md:py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed",
                   item.danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"
                 )}
               >

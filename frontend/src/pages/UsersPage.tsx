@@ -187,7 +187,7 @@ export default function UsersPage() {
             role="tab"
             aria-selected={tab === key}
             onClick={() => updateParams({ tab: key === "members" ? null : key }, { keepPage: true })}
-            className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
+            className={`min-h-10 md:min-h-0 px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
               tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
@@ -273,7 +273,50 @@ export default function UsersPage() {
           )}
 
           {data && data.items.length > 0 && (
-            <div className={`${card} overflow-x-auto ${membersQuery.isPlaceholderData ? "opacity-70" : ""}`}>
+            <>
+            {/* Phones: one card per person; tapping it opens the edit sheet. */}
+            <ul className={`md:hidden space-y-2 ${membersQuery.isPlaceholderData ? "opacity-70" : ""}`} aria-label="People">
+              {data.items.map((u) => (
+                <li key={u.id} className={`${card} flex items-start gap-1 pr-1`}>
+                  <button
+                    onClick={() => updateParams({ user: u.id }, { keepPage: true })}
+                    className="flex min-w-0 flex-1 items-start gap-3 p-3 text-left rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+                    aria-label={`Open ${u.name}`}
+                  >
+                    <Avatar name={u.name} size="md" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-gray-900">{u.name}</span>
+                      <span className="block truncate text-xs text-gray-600">{u.title ? `${u.title} · ${u.email}` : u.email}</span>
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        <RoleBadge role={u.role} />
+                        <UserStatusBadge status={u.status} />
+                      </span>
+                      <span className="mt-1.5 block text-xs text-gray-600">
+                        {[u.center?.name, u.department?.name, u.manager ? `Reports to ${u.manager.name}` : null].filter(Boolean).join(" · ") || "No center, department or manager"}
+                      </span>
+                    </span>
+                  </button>
+                  {u.role !== "OWNER" && (
+                    <span className="mt-1">
+                      <ActionMenu
+                        label={`Actions for ${u.name}`}
+                        items={[
+                          { label: "Edit details", onSelect: () => updateParams({ user: u.id }, { keepPage: true }) },
+                          {
+                            label: "Remove user…",
+                            danger: true,
+                            disabled: u.id === me?.id,
+                            title: u.id === me?.id ? "You can't remove your own account" : undefined,
+                            onSelect: () => setPending({ kind: "remove", user: u }),
+                          },
+                        ]}
+                      />
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className={`hidden md:block ${card} overflow-x-auto ${membersQuery.isPlaceholderData ? "opacity-70" : ""}`}>
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
                   <tr>
@@ -342,6 +385,7 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {data && data.meta.total > 0 && (

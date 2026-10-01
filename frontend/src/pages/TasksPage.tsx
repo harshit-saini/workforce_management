@@ -14,9 +14,10 @@ import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
 import QueryError, { LoadingText } from "@/components/QueryError";
-import { IconBoard, IconDownload, IconPlus, IconSearch, IconUpload, IconX } from "@/components/icons";
+import { IconBoard, IconChevronDown, IconDownload, IconPlus, IconSearch, IconUpload, IconX } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
 import { btnPrimary, btnSecondary, filterControl, quickChip } from "@/lib/ui";
+import ActionMenu from "@/components/ActionMenu";
 import { addDays, endOfWeek, format } from "date-fns";
 import { OPEN_CATEGORIES } from "@/lib/links";
 
@@ -55,6 +56,8 @@ export default function TasksPage() {
   const [searchInput, setSearchInput] = useState(params.get("q") ?? "");
   const search = useDebouncedValue(searchInput);
   const [showCreate, setShowCreate] = useState(false);
+  /** Phones keep search and filters behind one button; larger screens always show them. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   /** Filter changes replace the current history entry so Back isn't cluttered with them. */
@@ -206,15 +209,49 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">Tasks</h1>
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mt-2">
+      <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2">
+        <h1 className="text-lg font-semibold text-gray-900">Tasks</h1>
+        <div className="flex items-center gap-2 md:row-span-2 md:col-start-2 md:row-start-1">
+          {isAdmin && (
+            <>
+              <Link to="/tasks/import" className={`${btnSecondary} hidden md:inline-flex`}>
+                <IconUpload className="w-4 h-4" /> Import
+              </Link>
+              <button
+                onClick={exportTasks}
+                disabled={exporting || hasNoTasks}
+                className={`${btnSecondary} hidden md:inline-flex`}
+                title={hasNoTasks ? "Nothing to export yet" : "Download the tasks matching the current filters as an Excel file"}
+              >
+                <IconDownload className="w-4 h-4" /> {exporting ? "Exporting…" : "Export"}
+              </button>
+              {/* On a phone "New task" is the only main button; the rest wait in a menu. */}
+              <span className="md:hidden">
+                <ActionMenu
+                  label="More task actions"
+                  items={[
+                    { label: "Import from Excel", onSelect: () => navigate("/tasks/import") },
+                    {
+                      label: exporting ? "Exporting…" : "Export to Excel",
+                      onSelect: exportTasks,
+                      disabled: exporting || hasNoTasks,
+                      title: hasNoTasks ? "Nothing to export yet" : undefined,
+                    },
+                  ]}
+                />
+              </span>
+            </>
+          )}
+          <button onClick={() => setShowCreate(true)} className={btnPrimary}>
+            <IconPlus className="w-4 h-4" /> New task
+          </button>
+        </div>
+          <div className="col-span-2 md:col-span-1 flex w-fit gap-1 bg-gray-100 rounded-lg p-1 md:row-start-2">
             {(["board", "list", "ongoing"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => updateParams({ view: t === "board" ? null : t })}
-                className={`px-3 py-1.5 text-sm rounded-md capitalize transition-colors ${
+                className={`min-h-10 md:min-h-0 px-3 py-1.5 text-sm rounded-md capitalize transition-colors ${
                   tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
@@ -222,40 +259,32 @@ export default function TasksPage() {
               </button>
             ))}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <>
-              <Link to="/tasks/import" className={btnSecondary}>
-                <IconUpload className="w-4 h-4" /> Import
-              </Link>
-              <button
-                onClick={exportTasks}
-                disabled={exporting || hasNoTasks}
-                className={btnSecondary}
-                title={hasNoTasks ? "Nothing to export yet" : "Download the tasks matching the current filters as an Excel file"}
-              >
-                <IconDownload className="w-4 h-4" /> {exporting ? "Exporting…" : "Export"}
-              </button>
-            </>
-          )}
-          <button onClick={() => setShowCreate(true)} className={btnPrimary}>
-            <IconPlus className="w-4 h-4" /> New task
-          </button>
-        </div>
       </div>
 
       {!hasNoTasks && (
       <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          aria-controls="task-filters"
+          className={`${btnSecondary} md:hidden w-full justify-between`}
+        >
+          <span className="inline-flex items-center gap-2">
+            <IconSearch className="w-4 h-4" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+          </span>
+          <IconChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+        </button>
+        <div id="task-filters" className={`${filtersOpen ? "block" : "hidden"} md:block space-y-2`}>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative max-md:w-full">
             <IconSearch className="w-4 h-4 text-subtle absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               placeholder="Search…"
               aria-label="Search tasks"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className={`${filterControl(!!searchInput)} pl-8 w-48`}
+              className={`${filterControl(!!searchInput)} pl-8 w-48 max-md:w-full`}
             />
           </div>
           <span className="hidden sm:block h-5 w-px bg-gray-200" aria-hidden="true" />
@@ -325,6 +354,7 @@ export default function TasksPage() {
               </button>
             </span>
           )}
+        </div>
         </div>
         {data && (
           <div className="flex flex-wrap items-center gap-x-3 text-sm text-gray-600" aria-live="polite">

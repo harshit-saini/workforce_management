@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSetup } from "@/hooks/useSetup";
 import { usePopover } from "@/hooks/usePopover";
+import { btnIcon } from "@/lib/ui";
 import { NavBadge, useNavBadges } from "@/hooks/useNavBadges";
 import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
@@ -270,7 +271,7 @@ export default function Layout() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={openPalette}
-              className="sm:hidden rounded-full p-2 text-gray-600 hover:bg-gray-100"
+              className={`${btnIcon} sm:hidden`}
               aria-label="Search tasks, people and pages"
             >
               <IconSearch className="w-5 h-5" />
@@ -283,7 +284,7 @@ export default function Layout() {
                 aria-haspopup="true"
                 aria-expanded={menuOpen}
                 aria-label={`Account menu for ${user.name}`}
-                className="flex items-center gap-2 rounded-full hover:bg-gray-50 pr-1"
+                className="flex h-10 w-10 md:h-auto md:w-auto items-center justify-center gap-2 rounded-full hover:bg-gray-50 md:pr-1"
               >
                 <Avatar name={user.name} size="sm" />
               </button>
