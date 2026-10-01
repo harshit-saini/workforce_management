@@ -73,6 +73,15 @@ export default function TasksPage() {
   }
 
   useEffect(() => {
+    // Links from the setup checklist land here with the new-task form already open.
+    if (params.get("new") === "1") {
+      setShowCreate(true);
+      updateParams({ new: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if ((params.get("q") ?? "") !== search) updateParams({ q: search || null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);

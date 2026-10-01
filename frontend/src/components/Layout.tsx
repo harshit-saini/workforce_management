@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import NotificationBell, { useBellNotifications } from "@/components/NotificationBell";
 import { api } from "@/lib/api";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useSetup } from "@/hooks/useSetup";
 import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
 import { APP_ROUTES, NAV_GROUPS, matchRoute } from "@/lib/routes";
@@ -40,6 +41,7 @@ export default function Layout() {
     enabled: !!user,
   });
   const { data: bell } = useBellNotifications();
+  const setup = useSetup();
   const current = matchRoute(location.pathname);
   const unread = bell?.unreadCount ?? 0;
   usePageTitle(`${unread > 0 ? `(${unread}) ` : ""}${current ? current.label : "Page not found"}`, org?.name);
@@ -94,6 +96,22 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3">
+          {setup.active && (
+            <Link
+              to="/"
+              onClick={() => setSidebarOpen(false)}
+              title={collapsed ? `Setup ${setup.doneCount}/${setup.total}` : undefined}
+              className={clsx(
+                "mx-2 mb-3 flex items-center justify-between gap-2 rounded-md bg-brand-50 px-2.5 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-100",
+                collapsed && "md:justify-center md:px-1"
+              )}
+            >
+              <span className={clsx(collapsed && "md:hidden")}>Setup</span>
+              <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
+                {setup.doneCount}/{setup.total}
+              </span>
+            </Link>
+          )}
           {NAV_GROUPS.map((group) => {
             const visibleItems = group.items.filter((item) => item.roles.includes(user.role));
             if (visibleItems.length === 0) return null;

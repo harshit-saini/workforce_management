@@ -8,6 +8,8 @@ import DateRangePicker, { RangeValue } from "@/components/DateRangePicker";
 import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
+import GettingStarted from "@/components/GettingStarted";
+import { useSetup } from "@/hooks/useSetup";
 import { IconChart } from "@/components/icons";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -42,15 +44,19 @@ export default function DashboardPage() {
     placeholderData: keepPreviousData,
   });
   const { data } = overviewQuery;
+  // Before the first task there is nothing to measure: six zeros would only bury the checklist.
+  const { noTasksYet } = useSetup();
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
-        <DateRangePicker value={range} onChange={setRange} />
+        {!noTasksYet && <DateRangePicker value={range} onChange={setRange} />}
       </div>
 
-      {isAdmin && (
+      {isAdmin && <GettingStarted />}
+
+      {noTasksYet ? null : isAdmin && (
         <div className="flex gap-3">
           {(centers?.length ?? 0) > 0 && (
             <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
@@ -75,7 +81,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!data ? (
+      {noTasksYet ? null : !data ? (
         overviewQuery.isError ? (
           <QueryError
             title="Couldn't load the overview"

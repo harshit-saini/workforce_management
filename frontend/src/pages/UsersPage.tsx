@@ -1,4 +1,5 @@
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
@@ -55,6 +56,14 @@ type Pending =
 
 export default function UsersPage() {
   const [showInvite, setShowInvite] = useState(false);
+  // Links from the setup checklist land here with the invite form already open.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("invite") === "1") {
+      setShowInvite(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [pending, setPending] = useState<Pending | null>(null);
   const { user: me } = useAuth();
   const usersQuery = useUsersList();
