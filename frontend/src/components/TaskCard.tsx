@@ -3,15 +3,14 @@ import { useDraggable } from "@dnd-kit/core";
 import clsx from "clsx";
 import { Task, TaskStatus } from "@/types";
 import ActionMenu from "@/components/ActionMenu";
-import { format, isPast, isToday } from "date-fns";
 import Avatar from "@/components/Avatar";
 import PriorityBadge from "@/components/PriorityBadge";
-import { IconCalendar } from "@/components/icons";
+import DueDate from "@/components/DueDate";
+import { useIsDone } from "@/hooks/useLookups";
 
 /** Pure visual card, no drag hooks — used both by the real draggable card and the DragOverlay preview. */
 export function TaskCardContent({ task, actions }: { task: Task; actions?: ReactNode }) {
-  const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-  const overdue = dueDate && isPast(dueDate) && !isToday(dueDate);
+  const isDone = useIsDone();
   const subtasksDone = task.subtasks?.filter((s) => s.status === "DONE").length ?? 0;
   const subtasksTotal = task.subtasks?.length ?? 0;
 
@@ -48,13 +47,9 @@ export function TaskCardContent({ task, actions }: { task: Task; actions?: React
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <PriorityBadge priority={task.priority} />
-          {dueDate && (
-            <span className={clsx("inline-flex items-center gap-1 text-xs", overdue ? "text-red-600 font-medium" : "text-subtle")}>
-              <IconCalendar className="w-3.5 h-3.5" />
-              {format(dueDate, "MMM d")}
-            </span>
-          )}
+          {/* Only the levels that need attention; Medium/Low are the norm and just add noise. */}
+          {(task.priority === "HIGH" || task.priority === "URGENT") && <PriorityBadge priority={task.priority} />}
+          <DueDate dueDate={task.dueDate} done={isDone(task)} />
         </div>
         <Avatar name={task.assignee?.name} size="xs" />
       </div>

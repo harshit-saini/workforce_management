@@ -1,13 +1,13 @@
-import { format, isPast, isToday } from "date-fns";
-import clsx from "clsx";
 import { Task } from "@/types";
-import { useTaskStatuses } from "@/hooks/useLookups";
+import { useIsDone, useTaskStatuses } from "@/hooks/useLookups";
+import DueDate from "@/components/DueDate";
 import StatusBadge from "@/components/StatusBadge";
 import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
 
 export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
   const { data: statuses } = useTaskStatuses();
+  const isDone = useIsDone();
 
   return (
     <div className="bg-white rounded-xl border border-gray-200/80 shadow-card overflow-x-auto">
@@ -25,8 +25,6 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
         <tbody>
           {tasks.map((t) => {
             const statusOption = statuses?.find((s) => s.key === t.status);
-            const dueDate = t.dueDate ? new Date(t.dueDate) : null;
-            const overdue = dueDate && isPast(dueDate) && !isToday(dueDate);
             return (
               <tr key={t.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => onOpen(t.id)}>
                 <td className="px-4 py-2.5 font-medium text-gray-800">
@@ -51,8 +49,8 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500">{t.center?.name ?? "—"}</td>
-                <td className={clsx("px-4 py-2.5", overdue ? "text-red-600 font-medium" : "text-gray-500")}>
-                  {dueDate ? format(dueDate, "MMM d, yyyy") : "—"}
+                <td className="px-4 py-2.5">
+                  {t.dueDate ? <DueDate dueDate={t.dueDate} done={isDone(t)} /> : <span className="text-subtle">—</span>}
                 </td>
               </tr>
             );

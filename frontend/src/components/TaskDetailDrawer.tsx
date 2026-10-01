@@ -11,11 +11,13 @@ import Avatar from "@/components/Avatar";
 import { IconChevronDown, IconLink, IconPlus, IconUpload, IconX } from "@/components/icons";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 import { badgeColors } from "@/lib/color";
+import DueDate from "@/components/DueDate";
+import TagInput from "@/components/TagInput";
 import { toast } from "@/lib/toast";
 import { taskHref } from "@/lib/links";
 import { getErrorMessage } from "@/lib/errors";
 import QueryError from "@/components/QueryError";
-import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
+import { useCenters, useDepartments, useIsDone, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
 
@@ -28,6 +30,7 @@ interface EditForm {
   departmentId: string;
   dueDate: string;
   estimatedHours: string;
+  tags: string[];
 }
 
 function toEditForm(task: Task): EditForm {
@@ -40,6 +43,7 @@ function toEditForm(task: Task): EditForm {
     departmentId: task.departmentId ?? "",
     dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
     estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : "",
+    tags: task.tags.map((t) => t.label),
   };
 }
 
@@ -72,6 +76,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const { data: statuses } = useTaskStatuses();
+  const isDone = useIsDone();
 
   function statusLabel(key: string): string {
     return statuses?.find((s) => s.key === key)?.label ?? key;
@@ -166,6 +171,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
         departmentId: form.departmentId || null,
         dueDate: form.dueDate || null,
         estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : null,
+        tags: form.tags,
       }),
     onSuccess: () => {
       setIsEditing(false);
@@ -254,9 +260,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 {task.assignee?.name ?? "Unassigned"}
               </span>
               {task.center && <span className="px-2 py-0.5 rounded bg-gray-100">{task.center.name}</span>}
-              {task.dueDate && (
-                <span className="px-2 py-0.5 rounded bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
-              )}
+              <DueDate dueDate={task.dueDate} done={isDone(task)} full />
             </div>
             {pendingBlockedStatus && (
               <form
@@ -296,6 +300,15 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                   <span className="font-medium">Blocked:</span> {task.blockedReason}
                 </div>
               )}
+            {task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {task.tags.map((t) => (
+                  <span key={t.id} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                    {t.label}
+                  </span>
+                ))}
+              </div>
+            )}
             {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
           </>
         ) : (
@@ -393,6 +406,12 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                   onChange={(e) => setEditForm({ ...editForm!, estimatedHours: e.target.value })}
                 />
               </label>
+            </div>
+            <div className="mb-3">
+              <span className="text-xs text-gray-500">Tags</span>
+              <div className="mt-0.5">
+                <TagInput value={editForm!.tags} onChange={(tags) => setEditForm({ ...editForm!, tags })} />
+              </div>
             </div>
             {saveEdit.isError && (
               <p className="text-xs text-red-600 mb-2">Couldn't save changes: {getErrorMessage(saveEdit.error)}</p>

@@ -1,10 +1,10 @@
 import { TaskPriority } from "@/types";
-import { IconChevronsUp, IconChevronUp, IconChevronDown } from "@/components/icons";
+import { IconChevronsUp, IconChevronUp, IconChevronDown, IconEqual } from "@/components/icons";
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; icon: (className: string) => JSX.Element }> = {
   URGENT: { label: "Urgent", color: "#ae2e24", icon: (c) => <IconChevronsUp className={c} /> },
   HIGH: { label: "High", color: "#c25100", icon: (c) => <IconChevronUp className={c} /> },
-  MEDIUM: { label: "Medium", color: "#946f00", icon: (c) => <span className={`${c} block text-center leading-none`}>=</span> },
+  MEDIUM: { label: "Medium", color: "#946f00", icon: (c) => <IconEqual className={c} /> },
   LOW: { label: "Low", color: "#216e4e", icon: (c) => <IconChevronDown className={c} /> },
 };
 

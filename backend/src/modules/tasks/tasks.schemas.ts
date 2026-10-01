@@ -2,6 +2,22 @@ import { z } from "zod";
 import { StatusCategory, TaskPriority } from "@prisma/client";
 import { MAX_IMPORT_ROWS } from "./taskSheet.js";
 
+/** Up to 20 labels of at most 50 characters; blanks dropped and case-insensitive repeats merged (first spelling wins). */
+export const tagsSchema = z
+  .array(z.string())
+  .transform((tags) => {
+    const seen = new Set<string>();
+    return tags
+      .map((t) => t.trim())
+      .filter((t) => {
+        const key = t.toLowerCase();
+        if (!t || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  })
+  .pipe(z.array(z.string().max(50)).max(20));
+
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().optional(),
@@ -16,7 +32,7 @@ export const createTaskSchema = z.object({
   parentTaskId: z.string().optional(),
   dueDate: z.coerce.date().optional(),
   estimatedHours: z.number().min(0).optional(),
-  tags: z.array(z.string()).default([]),
+  tags: tagsSchema.default([]),
   watcherIds: z.array(z.string()).default([]),
 });
 
@@ -32,7 +48,7 @@ export const updateTaskSchema = z.object({
   dueDate: z.coerce.date().optional().nullable(),
   estimatedHours: z.number().min(0).optional().nullable(),
   blockedReason: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
+  tags: tagsSchema.optional(),
   watcherIds: z.array(z.string()).optional(),
 });
 

@@ -4,6 +4,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
 import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
+import TagInput from "@/components/TagInput";
 import { Task, TaskPriority, TaskStatus } from "@/types";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 
@@ -39,6 +40,7 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
   const [departmentId, setDepartmentId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [isRecurring, setIsRecurring] = useState(!!defaultRecurring);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +62,7 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
         departmentId: departmentId || undefined,
         dueDate: dueDate || undefined,
         estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
+        tags,
       };
       const { data: created } = parentTaskId
         ? await api.post<Task>(`/tasks/${parentTaskId}/subtasks`, payload)
@@ -156,6 +159,9 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
               <input type="number" min={0} step={0.5} className={inputClass} value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} />
             </FormField>
           </div>
+          <FormField label="Tags">
+            <TagInput value={tags} onChange={setTags} />
+          </FormField>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
             <button type="button" onClick={onClose} className={btnSecondary}>
