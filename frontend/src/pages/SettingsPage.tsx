@@ -13,6 +13,7 @@ import QueryError, { LoadingText } from "@/components/QueryError";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusBadge from "@/components/StatusBadge";
 import { badgeColors, contrastRatio, hexToRgb } from "@/lib/color";
+import Dialog from "@/components/Dialog";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -337,8 +338,8 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+    <Dialog label={"Add status"} size="sm" onClose={onClose} closeOnOutside={!(label)}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">Add status</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Label">
@@ -376,6 +377,6 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

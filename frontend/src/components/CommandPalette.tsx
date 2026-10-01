@@ -8,6 +8,7 @@ import { useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 import { taskHref } from "@/lib/links";
 import { Paginated, Role, Task } from "@/types";
 import Avatar from "@/components/Avatar";
+import Dialog from "@/components/Dialog";
 import StatusBadge from "@/components/StatusBadge";
 import { IconBell, IconBoard, IconChart, IconHome, IconPlus, IconSearch, IconSettings, IconSitemap, IconUpload, IconUsers, IconBuilding } from "@/components/icons";
 
@@ -93,13 +94,6 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
     placeholderData: keepPreviousData,
   });
 
-  // Put focus back where it was when the palette closes.
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    inputRef.current?.focus();
-    return () => previous?.focus?.();
-  }, []);
-
   const go = (to: string) => {
     onClose();
     navigate(to);
@@ -183,9 +177,6 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       e.preventDefault();
       if (items[active]) items[active].run();
       else if (q) go(`/tasks?q=${encodeURIComponent(query.trim())}`);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
     } else if (e.key === "Tab") {
       // One field and a list driven by arrow keys: keep focus where typing happens.
       e.preventDefault();
@@ -196,12 +187,13 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   let lastGroup: Group | null = null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Search and commands" className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-popover" onKeyDown={onKeyDown}>
+    <Dialog label="Search and commands" size="lg" align="top" onClose={onClose} panelClassName="max-w-xl overflow-hidden">
+      <div onKeyDown={onKeyDown}>
         <div className="flex items-center gap-2 border-b border-gray-100 px-4">
           <IconSearch className="h-4 w-4 shrink-0 text-gray-500" />
           <input
             ref={inputRef}
+            data-autofocus
             role="combobox"
             aria-expanded="true"
             aria-controls={listId}
@@ -263,7 +255,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
           {items.length} {items.length === 1 ? "result" : "results"}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

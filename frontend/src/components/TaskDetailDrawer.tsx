@@ -7,7 +7,8 @@ import AttachmentPreview from "@/components/AttachmentPreview";
 import AttachmentViewerModal from "@/components/AttachmentViewerModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Avatar from "@/components/Avatar";
-import { IconChevronDown, IconLink, IconUpload, IconX } from "@/components/icons";
+import { IconChevronDown, IconLink, IconUpload } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 import { badgeColors } from "@/lib/color";
 import DueDate from "@/components/DueDate";
@@ -260,15 +261,27 @@ export default function TaskDetailDrawer({
     if (title && !addSubtask.isPending) addSubtask.mutate(title);
   }
 
-  const shell = (children: ReactNode) => (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={requestClose} />
-      <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={requestClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
-          <IconX className="w-5 h-5" />
-        </button>
+  const shell = (children: ReactNode, withActions = true) => (
+    <>
+      <Dialog
+        variant="sheet"
+        label="Task details"
+        title="Task"
+        onClose={requestClose}
+        headerActions={
+          withActions && (
+            <button
+              onClick={copyLink}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900 whitespace-nowrap"
+              title="Copy a link to this task"
+            >
+              <IconLink className="w-3.5 h-3.5" /> Copy link
+            </button>
+          )
+        }
+      >
         {children}
-      </div>
+      </Dialog>
       {confirmingClose && (
         <ConfirmDialog
           title="Discard unsaved changes?"
@@ -279,7 +292,7 @@ export default function TaskDetailDrawer({
           onCancel={() => setConfirmingClose(false)}
         />
       )}
-    </div>
+    </>
   );
 
   if (!task) {
@@ -305,7 +318,8 @@ export default function TaskDetailDrawer({
           </div>
           <div className="text-sm text-subtle mt-4">Loading task…</div>
         </div>
-      )
+      ),
+      false
     );
   }
 
@@ -322,7 +336,7 @@ export default function TaskDetailDrawer({
   return shell(
     <>
       {task.parentTask && (
-        <div className="pr-8 mb-1 text-xs text-gray-600">
+        <div className="mb-1 text-xs text-gray-600">
           Parent:{" "}
           <button
             onClick={() => onOpenTask?.(task.parentTask!.id)}
@@ -334,7 +348,7 @@ export default function TaskDetailDrawer({
         </div>
       )}
       <h2 className="sr-only">{task.title}</h2>
-      <div className="flex items-start justify-between pr-8 gap-2">
+      <div className="flex items-start justify-between gap-2">
         <InlineText
           value={task.title}
           ariaLabel="Title"
@@ -343,13 +357,6 @@ export default function TaskDetailDrawer({
           className="!text-lg font-semibold -ml-2 flex-1 min-w-0"
           onCommit={(title) => save("title", { title }, { title })}
         />
-        <button
-          onClick={copyLink}
-          className="shrink-0 mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 whitespace-nowrap"
-          title="Copy a link to this task"
-        >
-          <IconLink className="w-3.5 h-3.5" /> Copy link
-        </button>
       </div>
       <div className="flex items-center gap-3 mt-2">
         <StatusPicker

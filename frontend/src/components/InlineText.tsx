@@ -69,6 +69,8 @@ export default function InlineText({
         className={`${common.className} resize-none overflow-hidden`}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
+            // Undoing an edit shouldn't also close the panel it's in; with nothing to undo, Escape closes as usual.
+            if (draft !== value) e.stopPropagation();
             setDraft(value);
             e.currentTarget.blur();
           }
@@ -84,6 +86,7 @@ export default function InlineText({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
         else if (e.key === "Escape") {
+          if (draft !== value) e.stopPropagation();
           setDraft(value);
           // Let the reverted text land before the blur compares it with the saved value.
           requestAnimationFrame(() => (e.target as HTMLInputElement).blur());

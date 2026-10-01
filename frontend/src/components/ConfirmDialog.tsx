@@ -1,5 +1,6 @@
-import { ReactNode, useEffect, useId, useRef, useState, FormEvent } from "react";
+import { ReactNode, useId, useRef, useState, FormEvent } from "react";
 import { btnDangerSolid, btnPrimary, btnSecondary } from "@/lib/ui";
+import Dialog from "@/components/Dialog";
 
 interface Props {
   title: string;
@@ -40,19 +41,6 @@ export default function ConfirmDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    (textInput ? textRef.current : cancelRef.current)?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !busy) onCancel();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [busy, onCancel]);
-
   const needsText = !!textInput && !textInput.optional;
   const canConfirm = !disabled && !busy && (!needsText || text.trim().length > 0);
 
@@ -68,13 +56,8 @@ export default function ConfirmDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onCancel();
-      }}
-    >
-      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="bg-white rounded-xl shadow-popover p-6 w-full max-w-sm">
+    <Dialog size="sm" labelledBy={titleId} onClose={onCancel} busy={busy}>
+      <div className="p-6">
         <h2 id={titleId} className="text-base font-semibold text-gray-900">
           {title}
         </h2>
@@ -86,6 +69,7 @@ export default function ConfirmDialog({
               <span className="block text-sm font-medium text-gray-700 mb-1">{textInput.label}</span>
               <textarea
                 ref={textRef}
+                data-autofocus
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -95,7 +79,8 @@ export default function ConfirmDialog({
             </label>
           )}
           <div className="flex justify-end gap-2">
-            <button ref={cancelRef} type="button" onClick={onCancel} disabled={busy} className={btnSecondary}>
+            {/* Cancel is where focus starts, so Enter can't confirm a destructive action by accident. */}
+            <button ref={cancelRef} data-autofocus={textInput ? undefined : true} type="button" onClick={onCancel} disabled={busy} className={btnSecondary}>
               Cancel
             </button>
             <button type="submit" disabled={!canConfirm} className={tone === "danger" ? btnDangerSolid : btnPrimary}>
@@ -104,6 +89,6 @@ export default function ConfirmDialog({
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

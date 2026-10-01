@@ -7,7 +7,7 @@ import Avatar from "@/components/Avatar";
 import ReportTracker from "@/components/ReportTracker";
 import ReportTaskList from "@/components/ReportTaskList";
 import QueryError from "@/components/QueryError";
-import { IconX } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 
 export type TeamStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "PENDING" | "OVERDUE";
@@ -47,14 +47,8 @@ export default function ReportReviewDrawer({ member, status, weekKey, onClose, o
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={close} />
-      <div role="dialog" aria-modal="true" aria-label={`${member.name}'s weekly report`} className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={close} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
-          <IconX className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-3 pr-8">
+    <Dialog variant="sheet" label={`${member.name}'s weekly report`} title="Weekly report" onClose={close}>
+        <div className="flex items-center gap-3">
           <Avatar name={member.name} size="md" />
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900 truncate">{member.name}</h2>
@@ -149,7 +143,6 @@ export default function ReportReviewDrawer({ member, status, weekKey, onClose, o
             <p className="text-xs text-gray-600 mt-1.5">Sends them a notification to submit this week's report.</p>
           </section>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

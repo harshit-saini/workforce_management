@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
@@ -9,6 +8,7 @@ import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { IconBell } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
+import { usePopover } from "@/hooks/usePopover";
 
 /** The bell's feed (also read by the tab title for the unread count). One query, shared by key. */
 export function useBellNotifications() {
@@ -27,7 +27,7 @@ export function useBellNotifications() {
 }
 
 export default function NotificationBell() {
-  const [open, setOpen] = useState(false);
+  const { open, close, toggle, triggerRef, panelRef } = usePopover();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data, isError } = useBellNotifications();
@@ -35,7 +35,7 @@ export default function NotificationBell() {
   async function openNotification(n: Notification) {
     const href = notificationHref(n);
     if (href) {
-      setOpen(false);
+      close();
       navigate(href);
     }
     if (n.isRead) return;
@@ -47,23 +47,44 @@ export default function NotificationBell() {
     }
   }
 
+  const markAllRead = useMutation({
+    mutationFn: () => api.post("/notifications/read-all"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    meta: { successMessage: "All notifications marked as read", errorTitle: "Couldn't mark notifications as read" },
+  });
+
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={triggerRef}
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={toggle}
         className="relative rounded-full p-2 hover:bg-gray-100"
         aria-label="Notifications"
       >
         <IconBell className="w-5 h-5" />
         {!!data?.unreadCount && (
           <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none">
-            {data.unreadCount}
+            <span aria-hidden="true">{data.unreadCount > 9 ? "9+" : data.unreadCount}</span>
+            <span className="sr-only">{data.unreadCount} unread</span>
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-popover z-20">
-          <div className="p-3 border-b border-gray-100 font-medium text-sm">Notifications</div>
+        <div ref={panelRef} className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-popover z-20">
+          <div className="flex items-center justify-between gap-2 p-3 border-b border-gray-100">
+            <span className="font-medium text-sm">Notifications</span>
+            {!!data?.unreadCount && (
+              <button
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+                className="text-xs text-brand-700 hover:underline disabled:opacity-50"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
           <div className="max-h-80 overflow-y-auto">
             {data?.items.length ? (
               data.items.map((n) => (
@@ -94,13 +115,13 @@ export default function NotificationBell() {
                 bare
                 icon={<IconBell />}
                 title="You're all caught up"
-                description="Assignments, comments and reminders will show up here."
+                description="Tasks assigned to you, comments, due-date reminders and report requests will appear here."
               />
             )}
           </div>
           <Link
             to="/notifications"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="block text-center text-sm text-brand-600 py-2 hover:bg-gray-50"
           >
             View all

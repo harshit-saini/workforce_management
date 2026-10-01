@@ -14,6 +14,7 @@ import { roleLabel, statusLabel, useUserEdits } from "@/hooks/useUserEdits";
 import FormField, { inputClass } from "@/components/FormField";
 import Avatar from "@/components/Avatar";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Dialog from "@/components/Dialog";
 import ActionMenu from "@/components/ActionMenu";
 import EmptyState from "@/components/EmptyState";
 import QueryError, { LoadingText } from "@/components/QueryError";
@@ -548,8 +549,8 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   if (sent) {
     return (
-      <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-        <div role="dialog" aria-modal="true" className="bg-white rounded-xl shadow-popover p-6 w-full max-w-md">
+      <Dialog label={sent.emailDelivered ? "Invite sent" : "Invite created"} size="md" onClose={onClose}>
+        <div className="p-6">
           <h2 className="text-base font-semibold text-gray-900">{sent.emailDelivered ? "Invite sent" : "Invite created"}</h2>
           {sent.emailDelivered ? (
             <p className="text-sm text-gray-600 mt-2">
@@ -570,13 +571,13 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             </button>
           </div>
         </div>
-      </div>
+      </Dialog>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-popover p-6 w-full max-w-sm">
+    <Dialog label="Invite user" size="sm" onClose={onClose} closeOnOutside={!email}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">Invite user</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Email">
@@ -637,7 +638,7 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

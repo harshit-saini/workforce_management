@@ -3,7 +3,7 @@ import { User } from "@/types";
 import Avatar from "@/components/Avatar";
 import InlineText, { fieldClass } from "@/components/InlineText";
 import { RoleBadge, UserStatusBadge } from "@/components/UserBadges";
-import { IconX } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 import { btnDanger } from "@/lib/ui";
 import { roleLabel, statusLabel, useUserEdits } from "@/hooks/useUserEdits";
 import { useCenters, useDepartments, useUsersList } from "@/hooks/useLookups";
@@ -48,15 +48,9 @@ export default function UserDrawer({ userId, me, onClose, onChangeRole, onChange
   const user = users.find((u) => u.id === userId);
 
   const shell = (children: ReactNode) => (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label="User details" className="relative w-full max-w-md bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={onClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
-          <IconX className="w-5 h-5" />
-        </button>
-        {children}
-      </div>
-    </div>
+    <Dialog variant="sheet" size="md" label="User details" title="Person" onClose={onClose}>
+      {children}
+    </Dialog>
   );
 
   if (!user) {
@@ -79,7 +73,7 @@ export default function UserDrawer({ userId, me, onClose, onChangeRole, onChange
 
   return shell(
     <>
-      <div className="flex items-center gap-3 pr-8">
+      <div className="flex items-center gap-3">
         <Avatar name={user.name} size="md" />
         <div className="min-w-0 flex-1">
           <InlineText

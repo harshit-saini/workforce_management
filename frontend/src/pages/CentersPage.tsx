@@ -11,6 +11,7 @@ import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
 import { IconBuilding } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 
 export default function CentersPage({ embedded = false }: { embedded?: boolean }) {
   const centersQuery = useCenters();
@@ -146,8 +147,8 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+    <Dialog label={"Add center"} size="sm" onClose={onClose} closeOnOutside={!(name || code || address)}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">Add center</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Name">
@@ -173,6 +174,6 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

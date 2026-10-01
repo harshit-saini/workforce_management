@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { usePopover } from "@/hooks/usePopover";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { IconMoreHorizontal } from "@/components/icons";
@@ -19,45 +20,30 @@ export interface ActionMenuItem {
  */
 export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; label: string }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const open = pos !== null;
+  const { open, setOpen, close, triggerRef: buttonRef, panelRef: menuRef } = usePopover<HTMLButtonElement>();
 
+  function place() {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) return close();
+    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }
+
+  // Follow the button while the page scrolls or resizes (the menu is fixed-positioned in a portal).
   useEffect(() => {
     if (!open) return;
-    const close = () => setPos(null);
-    function onDown(e: MouseEvent) {
-      const target = e.target as Node;
-      if (!menuRef.current?.contains(target) && !buttonRef.current?.contains(target)) close();
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        close();
-        buttonRef.current?.focus();
-      }
-    }
-    document.addEventListener("mousedown", onDown);
-    // Capture phase: a parent (like a draggable card) may stop key events from bubbling up to the document.
-    document.addEventListener("keydown", onKey, true);
-    function reposition() {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) return close();
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    }
-    window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
     return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function toggle() {
-    if (open) return setPos(null);
-    const rect = buttonRef.current!.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    if (open) return close();
+    place();
+    setOpen(true);
   }
 
   return (
@@ -72,7 +58,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
       >
         <IconMoreHorizontal className="w-5 h-5" />
       </button>
-      {open &&
+      {open && pos &&
         createPortal(
           <div
             ref={menuRef}
@@ -87,7 +73,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
                 disabled={item.disabled}
                 title={item.title}
                 onClick={() => {
-                  setPos(null);
+                  close();
                   item.onSelect();
                 }}
                 className={clsx(

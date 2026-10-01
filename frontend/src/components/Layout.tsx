@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -7,6 +7,7 @@ import NotificationBell, { useBellNotifications } from "@/components/Notificatio
 import { api } from "@/lib/api";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSetup } from "@/hooks/useSetup";
+import { usePopover } from "@/hooks/usePopover";
 import { NavBadge, useNavBadges } from "@/hooks/useNavBadges";
 import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
@@ -43,7 +44,10 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "1");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { open: menuOpen, close: closeMenu, toggle: toggleMenu, triggerRef: avatarRef, panelRef: menuRef } = usePopover();
+  const asideRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia("(min-width: 768px)").matches);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   usePaletteHotkeys(openPalette);
@@ -54,8 +58,33 @@ export default function Layout() {
   }, [collapsed]);
 
   useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // On a phone the sidebar is a slide-in menu. While it's closed it's off-screen, so it must not be reachable
+  // with Tab or a screen reader; while it's open, Escape closes it and focus comes back to the menu button.
+  const sidebarHidden = !isDesktop && !sidebarOpen;
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    if (sidebarHidden) el.setAttribute("inert", "");
+    else el.removeAttribute("inert");
+  }, [sidebarHidden]);
+  useEffect(() => {
+    if (isDesktop || !sidebarOpen) return;
+    asideRef.current?.querySelector<HTMLElement>("nav a, button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) {
+        setSidebarOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [sidebarOpen, isDesktop]);
 
   // Same key as the Settings page, so renaming the organization there updates this immediately.
   const { data: org } = useQuery({
@@ -86,6 +115,8 @@ export default function Layout() {
       )}
 
       <aside
+        ref={asideRef}
+        aria-hidden={sidebarHidden || undefined}
         className={clsx(
           "fixed md:static inset-y-0 left-0 z-40 shrink-0 border-r border-gray-200 bg-white flex flex-col",
           "transform transition-[transform,width] duration-200 md:translate-x-0",
@@ -113,7 +144,7 @@ export default function Layout() {
           </span>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-subtle hover:text-gray-700 shrink-0"
+            className="md:hidden flex h-10 w-10 -mr-2 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 shrink-0"
             aria-label="Close menu"
           >
             <IconX className="w-5 h-5" />
@@ -203,9 +234,11 @@ export default function Layout() {
         <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 sm:px-6 gap-4 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
+              ref={menuButtonRef}
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden text-gray-500 hover:text-gray-800 shrink-0"
+              className="md:hidden flex h-10 w-10 -ml-2 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 shrink-0"
               aria-label="Open menu"
+              aria-expanded={sidebarOpen}
             >
               <IconMenu className="w-5 h-5" />
             </button>
@@ -245,15 +278,18 @@ export default function Layout() {
             <NotificationBell />
             <div className="relative">
               <button
-                onClick={() => setMenuOpen((o) => !o)}
+                ref={avatarRef}
+                onClick={toggleMenu}
+                aria-haspopup="true"
+                aria-expanded={menuOpen}
+                aria-label={`Account menu for ${user.name}`}
                 className="flex items-center gap-2 rounded-full hover:bg-gray-50 pr-1"
               >
                 <Avatar name={user.name} size="sm" />
               </button>
               {menuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-popover z-20 py-1">
+                  <div ref={menuRef} className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-popover z-20 py-1">
                     <div className="px-3 py-2 border-b border-gray-100">
                       <div className="text-sm font-medium text-gray-800 truncate">{user.name}</div>
                       <div className="text-xs text-subtle truncate">{user.email}</div>
