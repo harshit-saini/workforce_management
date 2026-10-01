@@ -70,6 +70,11 @@ export default async function reportsRoutes(fastify: FastifyInstance) {
     return reportsService.submitWeeklyReport(request.authUser.organizationId, request.authUser, id, input);
   });
 
+  fastify.get("/reports/weekly/awaiting-review", async (request) => {
+    const count = await reportsService.countReportsAwaitingReview(request.authUser.organizationId, request.authUser);
+    return { count };
+  });
+
   fastify.put("/reports/weekly/:id/summary", async (request) => {
     const { id } = request.params as { id: string };
     const input = saveSummarySchema.parse(request.body);

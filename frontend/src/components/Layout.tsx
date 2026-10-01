@@ -7,6 +7,7 @@ import NotificationBell, { useBellNotifications } from "@/components/Notificatio
 import { api } from "@/lib/api";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSetup } from "@/hooks/useSetup";
+import { NavBadge, useNavBadges } from "@/hooks/useNavBadges";
 import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
 import { APP_ROUTES, NAV_GROUPS, matchRoute } from "@/lib/routes";
@@ -17,6 +18,24 @@ import {
   IconX,
   IconLogOut,
 } from "@/components/icons";
+
+const BADGE_BG = { red: "bg-red-600", blue: "bg-brand-600", amber: "bg-amber-500" } as const;
+
+/** A count or dot at the end of a menu item (on a collapsed rail it moves onto the icon instead). */
+function NavBadgeView({ badge, collapsed }: { badge: NavBadge; collapsed: boolean }) {
+  return (
+    <span title={badge.label} className={clsx("shrink-0", collapsed && "md:hidden")}>
+      <span className="sr-only">{badge.label}</span>
+      {badge.kind === "count" ? (
+        <span aria-hidden="true" className={clsx("inline-flex min-w-[1.25rem] justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white", BADGE_BG[badge.tone])}>
+          {badge.count! > 99 ? "99+" : badge.count}
+        </span>
+      ) : (
+        <span aria-hidden="true" className={clsx("block h-2 w-2 rounded-full", BADGE_BG[badge.tone])} />
+      )}
+    </span>
+  );
+}
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -42,6 +61,7 @@ export default function Layout() {
   });
   const { data: bell } = useBellNotifications();
   const setup = useSetup();
+  const badges = useNavBadges();
   const current = matchRoute(location.pathname);
   const unread = bell?.unreadCount ?? 0;
   usePageTitle(`${unread > 0 ? `(${unread}) ` : ""}${current ? current.label : "Page not found"}`, org?.name);
@@ -117,11 +137,11 @@ export default function Layout() {
             if (visibleItems.length === 0) return null;
             return (
               <div key={group.title} className="mb-4">
-                {!collapsed && (
-                  <div className="px-4 mb-1 text-[11px] font-semibold text-subtle uppercase tracking-wide md:block hidden">
-                    {group.title}
-                  </div>
-                )}
+                {/* Headings show on the phone drawer too; only the collapsed desktop rail drops them. */}
+                <div className={clsx("px-4 mb-1 text-[11px] font-semibold text-gray-600 uppercase tracking-wide", collapsed && "md:hidden")}>
+                  {group.title}
+                </div>
+                {collapsed && <div className="hidden md:block mx-3 mb-1 border-t border-gray-100" aria-hidden="true" />}
                 {visibleItems.map((item) => (
                   <NavLink
                     key={item.path}
@@ -139,8 +159,22 @@ export default function Layout() {
                       )
                     }
                   >
-                    {item.icon!("w-[18px] h-[18px] shrink-0")}
-                    <span className={clsx(collapsed && "md:hidden", "truncate")}>{item.label}</span>
+                    <span className="relative shrink-0">
+                      {item.icon!("w-[18px] h-[18px]")}
+                      {badges[item.path] && (
+                        <span
+                          aria-hidden="true"
+                          className={clsx(
+                            "absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-white",
+                            collapsed ? "md:block" : "md:hidden",
+                            "hidden",
+                            BADGE_BG[badges[item.path]!.tone]
+                          )}
+                        />
+                      )}
+                    </span>
+                    <span className={clsx(collapsed && "md:hidden", "truncate flex-1")}>{item.label}</span>
+                    {badges[item.path] && <NavBadgeView badge={badges[item.path]!} collapsed={collapsed} />}
                   </NavLink>
                 ))}
               </div>

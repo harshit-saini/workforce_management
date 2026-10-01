@@ -233,6 +233,20 @@ async function assertCanReview(organizationId: string, actor: AuthUser, reportOw
   }
 }
 
+/** How many submitted weekly reports (recent weeks) are waiting for this person's review; 0 for anyone who can't review. */
+export async function countReportsAwaitingReview(organizationId: string, actor: AuthUser, now = new Date()) {
+  if (actor.role === "EMPLOYEE") return 0;
+  const userIds = await resolveTeamUserIds(organizationId, actor);
+  return prisma.weeklyReport.count({
+    where: {
+      organizationId,
+      status: "SUBMITTED",
+      userId: userIds ? { in: userIds.filter((id) => id !== actor.id) } : { not: actor.id },
+      weekStartDate: { gte: addDays(startOfWeek(now), -7 * 8) },
+    },
+  });
+}
+
 /** Reminds people who haven't submitted, using the same notification as the Monday reminder. */
 export async function remindWeeklyReports(
   organizationId: string,

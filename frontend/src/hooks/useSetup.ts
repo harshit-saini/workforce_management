@@ -74,7 +74,7 @@ export function useSetup() {
       title: "Add a center",
       todo: "Centers are your offices or sites. Add the places your people work from.",
       done: hqName ? `${hqName} is set up. Add more offices any time.` : "Your first center is set up.",
-      action: { label: "Add a center", to: "/centers" },
+      action: { label: "Add a center", to: "/organization" },
       complete: (centers?.length ?? 0) > 0,
     },
     {
@@ -82,7 +82,7 @@ export function useSetup() {
       title: "Create departments",
       todo: "Group people by function — Engineering, Sales, Support — to filter work and reports by team.",
       done: `${departments?.length ?? 0} ${departments?.length === 1 ? "department" : "departments"} created.`,
-      action: { label: "Create departments", to: "/departments" },
+      action: { label: "Create departments", to: "/organization?tab=departments" },
       complete: (departments?.length ?? 0) > 0,
     },
     {

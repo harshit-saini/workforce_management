@@ -14,6 +14,7 @@ import ReportTaskList from "@/components/ReportTaskList";
 import ReportTracker from "@/components/ReportTracker";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import { IconAlertCircle, IconCheck } from "@/components/icons";
+import ReportsHeader from "@/components/ReportsHeader";
 import { btnPrimary, card } from "@/lib/ui";
 
 export default function WeeklyReportPage() {
@@ -121,6 +122,7 @@ function ReportView({
 
   return (
     <div className="space-y-4 max-w-2xl">
+      <ReportsHeader kind="weekly" scope={viewingOther ? "team" : "me"} />
       {viewingOther && (
         <Link to="/reports/weekly/team" className="text-xs text-brand-600 hover:underline">
           ← Team weekly reports
@@ -128,7 +130,7 @@ function ReportView({
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s weekly report` : "Weekly Report"}</h1>
+          <h2 className="text-base font-semibold text-gray-900">{subjectName ? `${subjectName}'s weekly report` : "Your weekly report"}</h2>
           <div className="text-xs text-subtle mt-0.5">Updated {formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true })}</div>
         </div>
         <div className="flex items-center gap-3">

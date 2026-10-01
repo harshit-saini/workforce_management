@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import ReportReviewDrawer, { TEAM_STATUS, TeamStatus } from "@/components/ReportReviewDrawer";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import { IconUsers } from "@/components/icons";
+import ReportsHeader from "@/components/ReportsHeader";
 import { btnSecondary, filterControl } from "@/lib/ui";
 
 interface TeamRow {
@@ -103,8 +104,9 @@ export default function WeeklyTeamReportPage() {
 
   return (
     <div className="space-y-4">
+      <ReportsHeader kind="weekly" scope="team" />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-gray-900">Team Weekly</h1>
+        <h2 className="text-base font-semibold text-gray-900">Team weekly</h2>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodStepper
             unit="week"

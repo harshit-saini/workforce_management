@@ -12,7 +12,7 @@ import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
 import { IconBuilding } from "@/components/icons";
 
-export default function CentersPage() {
+export default function CentersPage({ embedded = false }: { embedded?: boolean }) {
   const centersQuery = useCenters();
   const centers = centersQuery.data;
   const [showCreate, setShowCreate] = useState(false);
@@ -42,8 +42,8 @@ export default function CentersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Centers</h1>
+      <div className={`flex items-center ${embedded ? "justify-end" : "justify-between"}`}>
+        {!embedded && <h1 className="text-lg font-semibold text-gray-900">Centers</h1>}
         <button onClick={() => setShowCreate(true)} className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700">
           Add center
         </button>
