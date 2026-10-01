@@ -14,7 +14,8 @@ import TaskListTable from "@/components/TaskListTable";
 import TaskFormModal from "@/components/TaskFormModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
 import QueryError, { LoadingText } from "@/components/QueryError";
-import { IconDownload, IconPlus, IconSearch, IconUpload, IconX } from "@/components/icons";
+import { IconBoard, IconDownload, IconPlus, IconSearch, IconUpload, IconX } from "@/components/icons";
+import EmptyState from "@/components/EmptyState";
 import { btnPrimary, btnSecondary, filterControl, quickChip } from "@/lib/ui";
 import { addDays, endOfWeek, format } from "date-fns";
 import { OPEN_CATEGORIES } from "@/lib/links";
@@ -180,6 +181,13 @@ export default function TasksPage() {
     updateParams({ q: null, assignee: null, center: null, department: null, category: null, due: null, priority: null });
   }
 
+  // Nothing at all here yet (as opposed to nothing matching): the page should invite the first task
+  // instead of showing filters and empty columns for a workspace with nothing to filter.
+  const hasNoTasks = !!data && data.meta.total === 0 && activeFilterCount === 0;
+  const hasNoMatches = !!data && data.meta.total === 0 && activeFilterCount > 0;
+  const showCenters = !!centers && centers.length > 0;
+  const showDepartments = !!departments && departments.length > 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -207,9 +215,9 @@ export default function TasksPage() {
               </Link>
               <button
                 onClick={exportTasks}
-                disabled={exporting}
+                disabled={exporting || hasNoTasks}
                 className={btnSecondary}
-                title="Download the tasks matching the current filters as an Excel file"
+                title={hasNoTasks ? "Nothing to export yet" : "Download the tasks matching the current filters as an Excel file"}
               >
                 <IconDownload className="w-4 h-4" /> {exporting ? "Exporting…" : "Export"}
               </button>
@@ -221,6 +229,7 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {!hasNoTasks && (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -272,6 +281,7 @@ export default function TasksPage() {
               </option>
             ))}
           </select>
+          {(showCenters || centerId) && (
           <select aria-label="Center" value={centerId} onChange={(e) => updateParams({ center: e.target.value || null })} className={filterControl(!!centerId)}>
             <option value="">All centers</option>
             {centers?.map((c) => (
@@ -280,6 +290,8 @@ export default function TasksPage() {
               </option>
             ))}
           </select>
+          )}
+          {(showDepartments || departmentId) && (
           <select aria-label="Department" value={departmentId} onChange={(e) => updateParams({ department: e.target.value || null })} className={filterControl(!!departmentId)}>
             <option value="">All departments</option>
             {departments?.map((d) => (
@@ -288,6 +300,7 @@ export default function TasksPage() {
               </option>
             ))}
           </select>
+          )}
           {statusCategory && statusCategory !== "BLOCKED" && (
             <span className="inline-flex items-center gap-1 rounded-md border border-brand-500 bg-brand-50 pl-2.5 pr-1 py-1 text-sm text-brand-800">
               Status: {categoryFilterLabel(statusCategory)}
@@ -313,6 +326,7 @@ export default function TasksPage() {
           </div>
         )}
       </div>
+      )}
 
       {tasksQuery.isError && !data ? (
         <QueryError
@@ -325,7 +339,31 @@ export default function TasksPage() {
         <LoadingText />
       ) : null}
 
-      {data && tab === "board" && (
+      {hasNoTasks && (
+        <EmptyState
+          icon={<IconBoard />}
+          title={tab === "ongoing" ? "No ongoing tasks yet" : "Create your first task"}
+          description={
+            tab === "ongoing"
+              ? "Ongoing tasks are recurring responsibilities with no fixed finish line, like on-call duty or a weekly review."
+              : isAdmin
+                ? "Tasks are the work you assign and track. Add them one at a time, or bring a whole backlog in from Excel."
+                : "Tasks are the work you assign and track. Add your first one to get started."
+          }
+          primary={{ label: tab === "ongoing" ? "New ongoing task" : "New task", onClick: () => setShowCreate(true) }}
+          secondary={isAdmin && tab !== "ongoing" ? { label: "Import from Excel", to: "/tasks/import" } : undefined}
+        />
+      )}
+      {hasNoMatches && (
+        <EmptyState
+          icon={<IconSearch />}
+          title="No tasks match these filters"
+          description="Try removing a filter, or searching for something else."
+          primary={{ label: `Clear filters (${activeFilterCount})`, onClick: clearFilters }}
+        />
+      )}
+
+      {data && !hasNoTasks && !hasNoMatches && tab === "board" && (
         <KanbanBoard
           statuses={boardStatuses}
           tasks={tasks}
@@ -333,7 +371,7 @@ export default function TasksPage() {
           onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
         />
       )}
-      {data && (tab === "list" || tab === "ongoing") && <TaskListTable tasks={tasks} onOpen={openTask} />}
+      {data && !hasNoTasks && !hasNoMatches && (tab === "list" || tab === "ongoing") && <TaskListTable tasks={tasks} onOpen={openTask} />}
 
       {showCreate && <TaskFormModal
           onClose={() => setShowCreate(false)}

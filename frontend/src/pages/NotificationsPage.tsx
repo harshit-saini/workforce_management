@@ -5,6 +5,8 @@ import { notificationHref } from "@/lib/links";
 import { api } from "@/lib/api";
 import { Notification, NotificationType, Paginated } from "@/types";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import EmptyState from "@/components/EmptyState";
+import { IconBell } from "@/components/icons";
 
 const typeLabels: Record<NotificationType, string> = {
   TASK_DUE_SOON: "Task due soon",
@@ -15,6 +17,7 @@ const typeLabels: Record<NotificationType, string> = {
   TASK_ASSIGNED: "Task assigned",
   COMMENT_MENTION: "Comment / mention",
   MANUAL_NUDGE: "Manual nudge",
+  USER_JOINED: "New teammate joined",
 };
 
 interface Preference {
@@ -109,7 +112,14 @@ export default function NotificationsPage() {
               </span>
             </button>
           ))}
-          {data?.items.length === 0 && <div className="px-4 py-6 text-sm text-subtle text-center">No notifications</div>}
+          {data?.items.length === 0 && (
+            <EmptyState
+              bare
+              icon={<IconBell />}
+              title="You're all caught up"
+              description="Assignments, comments and reminders will show up here."
+            />
+          )}
         </div>
       </div>
 

@@ -5,6 +5,20 @@ export const signupSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(128),
+  // The browser's IANA timezone (e.g. "Asia/Kolkata"), used for the first center. Ignored if not a real zone.
+  timezone: z
+    .string()
+    .max(64)
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export const loginSchema = z.object({

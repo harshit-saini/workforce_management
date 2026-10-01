@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signup(organizationName: string, name: string, email: string, password: string) {
-    const { data } = await api.post("/auth/signup", { organizationName, name, email, password });
+    // The first center is created in the browser's timezone, so times in it make sense from day one.
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const { data } = await api.post("/auth/signup", { organizationName, name, email, password, timezone });
     setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
     setUser(data.user);
   }

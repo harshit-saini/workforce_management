@@ -75,7 +75,8 @@ export default function WeeklyTeamReportPage() {
           nextDisabled={weekStart >= currentWeekStart}
           onCurrent={weekStart.getTime() === currentWeekStart.getTime() ? undefined : () => goToWeek(currentWeekStart)}
         />
-        <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        {(centers?.length ?? 0) > 0 && (
+          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All centers</option>
           {centers?.map((c) => (
             <option key={c.id} value={c.id}>
@@ -83,6 +84,7 @@ export default function WeeklyTeamReportPage() {
             </option>
           ))}
         </select>
+        )}
         </div>
       </div>
 

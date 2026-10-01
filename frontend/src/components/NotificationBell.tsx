@@ -8,6 +8,7 @@ import { notificationHref } from "@/lib/links";
 import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { IconBell } from "@/components/icons";
+import EmptyState from "@/components/EmptyState";
 
 /** The bell's feed (also read by the tab title for the unread count). One query, shared by key. */
 export function useBellNotifications() {
@@ -89,7 +90,12 @@ export default function NotificationBell() {
             ) : isError ? (
               <div className="p-4 text-sm text-red-600">Couldn't load notifications. We'll keep trying.</div>
             ) : (
-              <div className="p-4 text-sm text-subtle">No notifications yet</div>
+              <EmptyState
+                bare
+                icon={<IconBell />}
+                title="You're all caught up"
+                description="Assignments, comments and reminders will show up here."
+              />
             )}
           </div>
           <Link

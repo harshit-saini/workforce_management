@@ -7,6 +7,8 @@ import { OverviewResult } from "@/types";
 import DateRangePicker, { RangeValue } from "@/components/DateRangePicker";
 import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import EmptyState from "@/components/EmptyState";
+import { IconChart } from "@/components/icons";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { OPEN_CATEGORIES, taskHref, tasksHref } from "@/lib/links";
@@ -50,7 +52,8 @@ export default function DashboardPage() {
 
       {isAdmin && (
         <div className="flex gap-3">
-          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          {(centers?.length ?? 0) > 0 && (
+            <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
             <option value="">All centers</option>
             {centers?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -58,7 +61,9 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
-          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          )}
+          {(departments?.length ?? 0) > 0 && (
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
             <option value="">All departments</option>
             {departments?.map((d) => (
               <option key={d.id} value={d.id}>
@@ -66,6 +71,7 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
+          )}
         </div>
       )}
 
@@ -110,6 +116,17 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl border border-gray-200/80 shadow-card p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Hours logged by day</div>
+              {data.hoursByDay.every((d) => d.hours === 0) ? (
+                <div className="h-[220px] flex items-center">
+                  <EmptyState
+                    bare
+                    icon={<IconChart />}
+                    title="No hours logged in this range"
+                    description="Hours appear here as people log time on their tasks."
+                    primary={{ label: "Go to tasks", to: "/tasks" }}
+                  />
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data.hoursByDay}>
                   <XAxis dataKey="date" tickFormatter={(d) => format(new Date(d), "MMM d")} fontSize={12} />
@@ -118,6 +135,7 @@ export default function DashboardPage() {
                   <Bar dataKey="hours" fill="#0c66e4" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200/80 shadow-card p-4">

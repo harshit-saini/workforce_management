@@ -1,11 +1,14 @@
 export class AppError extends Error {
   statusCode: number;
   code: string;
+  /** Extra, non-sensitive context the client can use (e.g. the organization an expired invite belongs to). */
+  details?: Record<string, unknown>;
 
-  constructor(message: string, statusCode = 400, code = "BAD_REQUEST") {
+  constructor(message: string, statusCode = 400, code = "BAD_REQUEST", details?: Record<string, unknown>) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 
   static badRequest(message: string) {

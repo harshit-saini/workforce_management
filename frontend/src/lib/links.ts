@@ -24,6 +24,8 @@ export function notificationHref(n: { type: string; relatedTaskId: string | null
       return "/reports/monthly/team";
     case "NO_TIME_LOGGED":
       return "/tasks";
+    case "USER_JOINED":
+      return "/users";
     default:
       return null;
   }

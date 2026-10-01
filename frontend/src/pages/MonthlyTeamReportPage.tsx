@@ -80,7 +80,8 @@ export default function MonthlyTeamReportPage() {
             nextDisabled={year > currentYear || (year === currentYear && month >= currentMonth)}
             onCurrent={isCurrentMonth ? undefined : () => goToMonth({ year: currentYear, month: currentMonth })}
           />
-          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className={selectClass}>
+          {(centers?.length ?? 0) > 0 && (
+            <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className={selectClass}>
             <option value="">All centers</option>
             {centers?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -88,7 +89,9 @@ export default function MonthlyTeamReportPage() {
               </option>
             ))}
           </select>
-          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectClass}>
+          )}
+          {(departments?.length ?? 0) > 0 && (
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectClass}>
             <option value="">All departments</option>
             {departments?.map((d) => (
               <option key={d.id} value={d.id}>
@@ -96,6 +99,7 @@ export default function MonthlyTeamReportPage() {
               </option>
             ))}
           </select>
+          )}
         </div>
       </div>
 

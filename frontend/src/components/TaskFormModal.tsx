@@ -130,6 +130,7 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
             </select>
           </FormField>
           <div className="grid grid-cols-2 gap-3">
+            {(centers?.length ?? 0) > 0 && (
             <FormField label="Center">
               <select className={inputClass} value={centerId} onChange={(e) => setCenterId(e.target.value)}>
                 <option value="">Default</option>
@@ -140,6 +141,8 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
                 ))}
               </select>
             </FormField>
+            )}
+            {(departments?.length ?? 0) > 0 && (
             <FormField label="Department">
               <select className={inputClass} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
                 <option value="">—</option>
@@ -150,6 +153,7 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
                 ))}
               </select>
             </FormField>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Due date">
