@@ -94,15 +94,22 @@ export default function NotificationsPage() {
                 const href = notificationHref(n);
                 if (href) navigate(href);
               }}
-              className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${n.isRead ? "text-gray-400" : "text-gray-800 font-medium"}`}
+              className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex gap-2.5 ${n.isRead ? "text-gray-600" : "text-gray-900 font-medium"}`}
             >
-              <div>{n.message}</div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {typeLabels[n.type]} · {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-              </div>
+              <span
+              className={n.isRead ? "w-2 h-2 shrink-0 mt-1.5" : "w-2 h-2 shrink-0 mt-1.5 rounded-full bg-brand-600"}
+              role={n.isRead ? undefined : "img"}
+              aria-label={n.isRead ? undefined : "Unread"}
+              />
+                  <span className="min-w-0 flex-1">
+                <div>{n.message}</div>
+                <div className="text-xs text-subtle font-normal mt-0.5">
+                  {typeLabels[n.type]} · {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                </div>
+              </span>
             </button>
           ))}
-          {data?.items.length === 0 && <div className="px-4 py-6 text-sm text-gray-400 text-center">No notifications</div>}
+          {data?.items.length === 0 && <div className="px-4 py-6 text-sm text-subtle text-center">No notifications</div>}
         </div>
       </div>
 

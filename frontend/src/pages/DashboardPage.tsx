@@ -123,7 +123,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl border border-gray-200/80 shadow-card p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Activity timeline</div>
               <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
-                {data.activityTimeline.length === 0 && <div className="text-sm text-gray-400 py-4">No activity in this range</div>}
+                {data.activityTimeline.length === 0 && <div className="text-sm text-subtle py-4">No activity in this range</div>}
                 {data.activityTimeline.map((a) => (
                   <Link
                     key={a.id}
@@ -133,7 +133,7 @@ export default function DashboardPage() {
                     <div className="text-gray-800">
                       <span className="font-medium">{a.userName}</span> — {a.message}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-subtle">
                       <span className="text-brand-700">{a.taskTitle}</span> ·{" "}
                       {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
                     </div>

@@ -15,7 +15,7 @@ import NotFoundPage from "@/pages/NotFoundPage";
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <div className="flex h-screen items-center justify-center text-gray-400">Loading…</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center text-subtle">Loading…</div>;
   if (!user) {
     // A hard redirect to /login?reason=expired is already in flight; don't race it with a plainer one.
     if (authRedirectPending) return null;

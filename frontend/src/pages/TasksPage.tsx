@@ -168,7 +168,7 @@ export default function TasksPage() {
                 key={t}
                 onClick={() => updateParams({ view: t === "board" ? null : t })}
                 className={`px-3 py-1.5 text-sm rounded-md capitalize transition-colors ${
-                  tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
+                  tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
                 {t}
@@ -200,7 +200,7 @@ export default function TasksPage() {
 
       <div className="flex flex-wrap gap-2">
         <div className="relative">
-          <IconSearch className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <IconSearch className="w-4 h-4 text-subtle absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             placeholder="Search…"
             value={searchInput}

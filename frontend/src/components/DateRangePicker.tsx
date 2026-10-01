@@ -47,7 +47,7 @@ export default function DateRangePicker({ value, onChange }: { value: RangeValue
             }}
             className="border border-gray-300 rounded-md px-2 py-1 text-sm"
           />
-          <span className="text-gray-400 text-sm">to</span>
+          <span className="text-subtle text-sm">to</span>
           <input
             type="date"
             value={end}

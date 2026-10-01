@@ -69,20 +69,27 @@ export default function NotificationBell() {
                 <button
                   key={n.id}
                   onClick={() => openNotification(n)}
-                  className={`w-full text-left px-3 py-2 border-b border-gray-50 text-sm hover:bg-gray-50 ${
-                    n.isRead ? "text-gray-400" : "text-gray-800 font-medium"
+                  className={`w-full text-left px-3 py-2 border-b border-gray-50 text-sm hover:bg-gray-50 flex gap-2 ${
+                    n.isRead ? "text-gray-600" : "text-gray-900 font-medium"
                   }`}
                 >
-                  <div>{n.message}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                  </div>
+                  <span
+                    className={n.isRead ? "w-2 h-2 shrink-0 mt-1.5" : "w-2 h-2 shrink-0 mt-1.5 rounded-full bg-brand-600"}
+                    role={n.isRead ? undefined : "img"}
+                    aria-label={n.isRead ? undefined : "Unread"}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <div>{n.message}</div>
+                    <div className="text-[11px] text-subtle font-normal mt-0.5">
+                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                    </div>
+                  </span>
                 </button>
               ))
             ) : isError ? (
               <div className="p-4 text-sm text-red-600">Couldn't load notifications. We'll keep trying.</div>
             ) : (
-              <div className="p-4 text-sm text-gray-400">No notifications yet</div>
+              <div className="p-4 text-sm text-subtle">No notifications yet</div>
             )}
           </div>
           <Link

@@ -10,6 +10,8 @@ import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import StatusBadge from "@/components/StatusBadge";
+import { badgeColors, contrastRatio, hexToRgb } from "@/lib/color";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -110,7 +112,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-sm font-semibold text-gray-700">Task statuses</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-subtle mt-0.5">
               Define your own workflow columns, Jira-style. Each status maps to a category, which is what powers
               dashboards and reports (e.g. completion rate looks at the "Done" category).
             </p>
@@ -120,7 +122,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 gap-y-1 text-xs text-gray-400 uppercase px-1 mb-1">
+        <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 gap-y-1 text-xs text-subtle uppercase px-1 mb-1">
           <span></span>
           <span></span>
           <span>Label</span>
@@ -149,7 +151,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => moveStatus(i, -1)}
                   disabled={i === 0}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                  className="text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move up"
                 >
                   <IconChevronUp className="w-3.5 h-3.5" />
@@ -157,7 +159,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => moveStatus(i, 1)}
                   disabled={!statuses || i === statuses.length - 1}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                  className="text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move down"
                 >
                   <IconChevronDown className="w-3.5 h-3.5" />
@@ -254,6 +256,15 @@ export default function SettingsPage() {
   );
 }
 
+/** Why a picked color might not work well, in plain words — or null if it's fine. */
+function colorWarning(hex: string): string | null {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+  if (contrastRatio(rgb, [255, 255, 255]) < 1.5) return "This color is almost white, so the column's top border will be hard to see.";
+  if (badgeColors(hex).adjusted) return "This color is light, so the badge text is darkened to stay readable.";
+  return null;
+}
+
 function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState<StatusCategory>("ACTIVE");
@@ -295,12 +306,16 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
             </select>
           </FormField>
           <FormField label="Color">
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-9 w-16 border border-gray-300 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-9 w-16 border border-gray-300 rounded cursor-pointer"
+              />
+              <StatusBadge label={label.trim() || "Preview"} color={color} />
+            </div>
+            {colorWarning(color) && <p className="text-xs text-amber-700 mt-1.5">{colorWarning(color)}</p>}
           </FormField>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">

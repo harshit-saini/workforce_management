@@ -109,7 +109,7 @@ export default function WeeklyTeamReportPage() {
                 {row.user.name}
               </Link>
               {row.report && (
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-subtle">
                   {row.report.tasksCompleted} completed · {row.report.hoursLogged.toFixed(1)}h logged
                 </div>
               )}
@@ -141,7 +141,7 @@ export default function WeeklyTeamReportPage() {
             </div>
           </div>
         ))}
-        {data?.length === 0 && <div className="px-4 py-6 text-sm text-gray-400 text-center">No team members found</div>}
+        {data?.length === 0 && <div className="px-4 py-6 text-sm text-subtle text-center">No team members found</div>}
       </div>
 
       {requestingChangesFor && (

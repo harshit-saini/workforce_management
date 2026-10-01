@@ -57,10 +57,10 @@ export default function DepartmentsPage() {
         {departments?.map((d) => (
           <div key={d.id} className="flex items-center justify-between px-4 py-3 text-sm">
             <div className="font-medium text-gray-800">{d.name}</div>
-            <div className="text-xs text-gray-400">{d._count?.members ?? 0} members</div>
+            <div className="text-xs text-subtle">{d._count?.members ?? 0} members</div>
           </div>
         ))}
-        {departments?.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No departments yet</div>}
+        {departments?.length === 0 && <div className="px-4 py-3 text-sm text-subtle">No departments yet</div>}
       </div>
     </div>
   );

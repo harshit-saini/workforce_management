@@ -148,8 +148,8 @@ export default function ComboCell({
         onKeyDown={onButtonKeyDown}
         className="w-full h-full min-h-[34px] px-2 py-1.5 flex items-center justify-between gap-1 text-left text-sm outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500"
       >
-        <span className={clsx("truncate", value === "" && "text-gray-400")}>{display}</span>
-        <IconChevronDown className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+        <span className={clsx("truncate", value === "" && "text-subtle")}>{display}</span>
+        <IconChevronDown className="w-3.5 h-3.5 shrink-0 text-subtle" />
       </button>
 
       {open &&
@@ -195,13 +195,13 @@ export default function ComboCell({
                   )}
                 >
                   <span className={clsx("truncate", option.value === "" && "italic text-gray-500")}>{option.label}</span>
-                  {option.sublabel && <span className="text-xs text-gray-400 truncate">{option.sublabel}</span>}
+                  {option.sublabel && <span className="text-xs text-subtle truncate">{option.sublabel}</span>}
                 </li>
               ))}
-              {visible.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">No matches</li>}
+              {visible.length === 0 && <li className="px-3 py-2 text-sm text-subtle">No matches</li>}
             </ul>
             {filtered.length > MAX_VISIBLE && (
-              <div className="px-3 py-1.5 text-xs text-gray-400 border-t border-gray-100">
+              <div className="px-3 py-1.5 text-xs text-subtle border-t border-gray-100">
                 Showing {MAX_VISIBLE} of {filtered.length} — keep typing to narrow down
               </div>
             )}

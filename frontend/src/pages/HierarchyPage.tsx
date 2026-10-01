@@ -88,7 +88,7 @@ export default function HierarchyPage() {
         {tree?.map((root) => (
           <OrgChartNode key={root.id} node={root} highlightId={highlightId} matchesFilter={matchesFilter} />
         ))}
-        {tree?.length === 0 && <div className="text-sm text-gray-400">No users yet</div>}
+        {tree?.length === 0 && <div className="text-sm text-subtle">No users yet</div>}
       </div>
     </div>
   );

@@ -42,5 +42,5 @@ export default function QueryError({
 }
 
 export function LoadingText({ label = "Loading…" }: { label?: string }) {
-  return <div className="text-gray-400 text-sm">{label}</div>;
+  return <div className="text-subtle text-sm">{label}</div>;
 }

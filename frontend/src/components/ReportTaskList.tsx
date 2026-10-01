@@ -24,10 +24,10 @@ export default function ReportTaskList({
     <div className={`${card} p-4`}>
       <div className="flex items-center justify-between mb-2">
         <div className="text-sm font-medium text-gray-700">{title}</div>
-        <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5">{tasks.length}</span>
+        <span className="text-xs text-subtle bg-gray-100 rounded-full px-1.5 py-0.5">{tasks.length}</span>
       </div>
       {tasks.length === 0 ? (
-        <div className="text-sm text-gray-400">{emptyLabel}</div>
+        <div className="text-sm text-subtle">{emptyLabel}</div>
       ) : (
         <ul className="divide-y divide-gray-100">
           {tasks.map((t) => {
@@ -45,7 +45,7 @@ export default function ReportTaskList({
                       <span
                         className={clsx(
                           "inline-flex items-center gap-1 text-xs",
-                          overdue ? "text-red-600 font-medium" : "text-gray-400"
+                          overdue ? "text-red-600 font-medium" : "text-subtle"
                         )}
                       >
                         <IconCalendar className="w-3.5 h-3.5" />

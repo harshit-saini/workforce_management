@@ -172,7 +172,7 @@ export default function UsersPage() {
                       <Avatar name={u.name} size="sm" />
                       <div>
                         <div className="font-medium text-gray-800">{u.name}</div>
-                        <div className="text-xs text-gray-400">{u.email}</div>
+                        <div className="text-xs text-subtle">{u.email}</div>
                       </div>
                     </div>
                   </td>
@@ -300,7 +300,7 @@ export default function UsersPage() {
                 <div key={invite.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <div>
                     <div className="text-gray-800">{invite.email}</div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-subtle">
                       {invite.role} · sent {formatDistanceToNow(new Date(invite.createdAt), { addSuffix: true })} ·{" "}
                       {expired ? (
                         <span className="text-red-500">expired</span>

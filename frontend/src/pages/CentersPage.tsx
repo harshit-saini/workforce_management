@@ -70,7 +70,7 @@ export default function CentersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-900">{c.name}</div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-subtle">
                   {c.code} · {c.timezone}
                 </div>
               </div>
