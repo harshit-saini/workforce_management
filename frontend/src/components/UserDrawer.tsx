@@ -202,7 +202,7 @@ export default function UserDrawer({ userId, me, onClose, onChangeRole, onChange
       </dl>
 
       <section className="mt-6" aria-label="Direct reports">
-        <h3 className="text-sm font-semibold text-gray-700 mb-1">Direct reports ({reports.length})</h3>
+        <h2 className="text-sm font-semibold text-gray-700 mb-1">Direct reports ({reports.length})</h2>
         {reports.length === 0 ? (
           <p className="text-xs text-subtle">No one reports to {user.name} yet.</p>
         ) : (
