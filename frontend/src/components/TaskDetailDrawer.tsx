@@ -343,7 +343,7 @@ export default function TaskDetailDrawer({
           ariaLabel="Title"
           required
           maxLength={200}
-          className="text-lg font-semibold -ml-2 flex-1 min-w-0"
+          className="!text-lg font-semibold -ml-2 flex-1 min-w-0"
           onCommit={(title) => save("title", { title }, { title })}
         />
         <button
