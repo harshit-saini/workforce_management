@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -10,6 +10,7 @@ import { useSetup } from "@/hooks/useSetup";
 import { NavBadge, useNavBadges } from "@/hooks/useNavBadges";
 import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
+import CommandPalette, { isMac, usePaletteHotkeys } from "@/components/CommandPalette";
 import { APP_ROUTES, NAV_GROUPS, matchRoute } from "@/lib/routes";
 import {
   IconChevronsLeft,
@@ -17,6 +18,7 @@ import {
   IconMenu,
   IconX,
   IconLogOut,
+  IconSearch,
 } from "@/components/icons";
 
 const BADGE_BG = { red: "bg-red-600", blue: "bg-brand-600", amber: "bg-amber-500" } as const;
@@ -42,6 +44,9 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "1");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  usePaletteHotkeys(openPalette);
   const location = useLocation();
 
   useEffect(() => {
@@ -219,7 +224,24 @@ export default function Layout() {
               </nav>
             )}
           </div>
+          <button
+            onClick={openPalette}
+            className="hidden sm:flex flex-1 max-w-sm items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-600 hover:bg-white hover:border-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+            aria-label="Search tasks, people and pages"
+            aria-keyshortcuts="Control+K Meta+K /"
+          >
+            <IconSearch className="h-4 w-4 shrink-0" />
+            <span className="flex-1 truncate text-left">Search tasks, people…</span>
+            <kbd className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] text-gray-600">{isMac ? "⌘K" : "Ctrl K"}</kbd>
+          </button>
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={openPalette}
+              className="sm:hidden rounded-full p-2 text-gray-600 hover:bg-gray-100"
+              aria-label="Search tasks, people and pages"
+            >
+              <IconSearch className="w-5 h-5" />
+            </button>
             <NotificationBell />
             <div className="relative">
               <button
@@ -251,6 +273,7 @@ export default function Layout() {
             </div>
           </div>
         </header>
+        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-50 p-4 sm:p-6">
           <Outlet />
         </main>
