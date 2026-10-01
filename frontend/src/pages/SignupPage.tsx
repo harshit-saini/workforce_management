@@ -1,10 +1,12 @@
 import { useState, FormEvent } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import FormField, { inputClass } from "@/components/FormField";
 import { btnPrimary } from "@/lib/ui";
 
 export default function SignupPage() {
+  usePageTitle("Create your workspace");
   const { signup } = useAuth();
   const navigate = useNavigate();
   const [organizationName, setOrganizationName] = useState("");

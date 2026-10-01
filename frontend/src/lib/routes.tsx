@@ -36,6 +36,8 @@ export interface AppRoute {
   end?: boolean;
   /** Sidebar group title. Routes without one aren't shown in the sidebar (e.g. reached via a link elsewhere). */
   group?: string;
+  /** Path of the route this one sits under. Only routes with a parent get a breadcrumb ("Tasks › Import from Excel"). */
+  parent?: string;
   icon?: (className: string) => JSX.Element;
 }
 
@@ -48,7 +50,7 @@ export interface AppRoute {
 export const APP_ROUTES: AppRoute[] = [
   { path: "", label: "Dashboard", roles: ALL_ROLES, end: true, group: "Work", icon: (c) => <IconHome className={c} />, element: <DashboardPage /> },
   { path: "tasks", label: "Tasks", roles: ALL_ROLES, group: "Work", icon: (c) => <IconBoard className={c} />, element: <TasksPage /> },
-  { path: "tasks/import", label: "Import tasks", roles: ["OWNER", "ADMIN"], element: <TaskImportPage /> },
+  { path: "tasks/import", label: "Import from Excel", parent: "tasks", roles: ["OWNER", "ADMIN"], element: <TaskImportPage /> },
   { path: "hierarchy", label: "Org Chart", roles: ALL_ROLES, group: "Work", icon: (c) => <IconSitemap className={c} />, element: <HierarchyPage /> },
 
   { path: "reports/weekly", label: "Weekly Report", roles: ALL_ROLES, end: true, group: "Reports", icon: (c) => <IconChart className={c} />, element: <WeeklyReportPage /> },

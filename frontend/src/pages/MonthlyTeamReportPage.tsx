@@ -64,7 +64,7 @@ export default function MonthlyTeamReportPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Team Monthly Rollup</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Team Monthly</h1>
           {data?.updatedAt && (
             <div className="text-xs text-gray-400 mt-0.5">
               {isCurrentMonth ? "Month still in progress · " : ""}Updated {formatDistanceToNow(new Date(data.updatedAt), { addSuffix: true })}

@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { btnPrimary, card } from "@/lib/ui";
 
 export default function NotFoundPage() {
+  usePageTitle("Page not found");
   return (
     <div className={`${card} max-w-md mx-auto mt-12 p-6 text-center`}>
       <h1 className="text-base font-semibold text-gray-900 mb-1">Page not found</h1>

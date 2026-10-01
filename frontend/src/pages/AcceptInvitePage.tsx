@@ -1,10 +1,12 @@
 import { useEffect, useState, FormEvent } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import FormField, { inputClass } from "@/components/FormField";
 
 export default function AcceptInvitePage() {
+  usePageTitle("Join your team");
   const { token } = useParams<{ token: string }>();
   const { acceptInvite } = useAuth();
   const navigate = useNavigate();

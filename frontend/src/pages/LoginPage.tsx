@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import FormField, { inputClass } from "@/components/FormField";
@@ -11,6 +12,7 @@ function safeNext(next: string | null): string {
 }
 
 export default function LoginPage() {
+  usePageTitle("Sign in");
   const { login } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
