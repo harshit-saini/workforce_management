@@ -31,6 +31,14 @@ async function assertCanViewUserReport(fastify: FastifyInstance, actorId: string
   throw AppError.forbidden("You cannot view this user's report");
 }
 
+/** "2026-09-21" means that calendar day locally, not UTC midnight (which can fall in the previous local day). */
+function parseDateParam(value: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+  if (Number.isNaN(date.getTime())) throw AppError.badRequest("Invalid week");
+  return date;
+}
+
 export default async function reportsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
 
@@ -38,13 +46,19 @@ export default async function reportsRoutes(fastify: FastifyInstance) {
     const query = weeklyQuerySchema.parse(request.query);
     const targetUserId = query.userId ?? request.authUser.id;
     await assertCanViewUserReport(fastify, request.authUser.id, request.authUser.role, targetUserId, request.authUser.organizationId);
-    const week = query.week ? new Date(query.week) : new Date();
-    return reportsService.getWeeklyReport(request.authUser.organizationId, targetUserId, week);
+    const orgId = request.authUser.organizationId;
+    // No week asked for: your own report opens on the oldest week still waiting to be submitted.
+    const week = query.week
+      ? parseDateParam(query.week)
+      : targetUserId === request.authUser.id
+        ? await reportsService.getDefaultWeek(orgId, targetUserId)
+        : new Date();
+    return reportsService.getWeeklyReport(orgId, targetUserId, week);
   });
 
   fastify.get("/reports/weekly/team-summary", async (request) => {
     const query = weeklyTeamSummaryQuerySchema.parse(request.query);
-    const week = query.week ? new Date(query.week) : new Date();
+    const week = query.week ? parseDateParam(query.week) : new Date();
     return reportsService.weeklyTeamSummary(request.authUser.organizationId, request.authUser, week, query.centerId);
   });
 

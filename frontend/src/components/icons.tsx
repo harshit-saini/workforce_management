@@ -282,3 +282,19 @@ export function IconMoreHorizontal(props: IconProps) {
     </svg>
   );
 }
+
+export function IconChevronLeft(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m14.5 6-6 6 6 6" />
+    </svg>
+  );
+}
+
+export function IconChevronRight(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m9.5 6 6 6-6 6" />
+    </svg>
+  );
+}

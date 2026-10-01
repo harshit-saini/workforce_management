@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { addDays } from "date-fns";
+import PeriodStepper from "@/components/PeriodStepper";
+import { dayParam, parseDay, weekLabel, weekStartOf } from "@/lib/periods";
 import { api } from "@/lib/api";
 import { useCenters } from "@/hooks/useLookups";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -23,15 +26,26 @@ const statusColor: Record<string, string> = {
 
 export default function WeeklyTeamReportPage() {
   const [centerId, setCenterId] = useState("");
+  // Opens on last week: that's the one whose reports are due, so submissions and OVERDUE show up.
+  const [params, setParams] = useSearchParams();
+  const currentWeekStart = weekStartOf(new Date());
+  const lastWeekStart = addDays(currentWeekStart, -7);
+  const weekStart = params.get("week") ? weekStartOf(parseDay(params.get("week")!)) : lastWeekStart;
+  const weekKey = dayParam(weekStart);
+  const goToWeek = (d: Date) => {
+    const next = new URLSearchParams(params);
+    next.set("week", dayParam(d));
+    setParams(next);
+  };
   /** The report being sent back; its dialog collects the (required) reason. */
   const [requestingChangesFor, setRequestingChangesFor] = useState<{ id: string; name: string } | null>(null);
   const { data: centers } = useCenters();
   const queryClient = useQueryClient();
 
   const summaryQuery = useQuery({
-    queryKey: ["weekly-team-summary", centerId],
+    queryKey: ["weekly-team-summary", centerId, weekKey],
     queryFn: async () =>
-      (await api.get<TeamRow[]>("/reports/weekly/team-summary", { params: { centerId: centerId || undefined } })).data,
+      (await api.get<TeamRow[]>("/reports/weekly/team-summary", { params: { centerId: centerId || undefined, week: weekKey } })).data,
     placeholderData: keepPreviousData,
   });
   const { data } = summaryQuery;
@@ -52,6 +66,15 @@ export default function WeeklyTeamReportPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Team Weekly Reports</h1>
+        <div className="flex flex-wrap items-center gap-2">
+        <PeriodStepper
+          unit="week"
+          label={weekLabel(weekStart)}
+          onPrev={() => goToWeek(addDays(weekStart, -7))}
+          onNext={() => goToWeek(addDays(weekStart, 7))}
+          nextDisabled={weekStart >= currentWeekStart}
+          onCurrent={weekStart.getTime() === currentWeekStart.getTime() ? undefined : () => goToWeek(currentWeekStart)}
+        />
         <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All centers</option>
           {centers?.map((c) => (
@@ -60,6 +83,7 @@ export default function WeeklyTeamReportPage() {
             </option>
           ))}
         </select>
+        </div>
       </div>
 
       {!data &&
@@ -79,7 +103,7 @@ export default function WeeklyTeamReportPage() {
           <div key={row.user.id} className="px-4 py-3 flex items-center justify-between">
             <div>
               <Link
-                to={`/reports/weekly?userId=${row.user.id}`}
+                to={`/reports/weekly?userId=${row.user.id}&week=${weekKey}`}
                 className="text-sm font-medium text-gray-800 hover:text-brand-700 hover:underline"
               >
                 {row.user.name}
