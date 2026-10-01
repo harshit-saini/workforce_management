@@ -13,6 +13,20 @@ export const btnDangerSolid =
 export const btnGhost =
   "inline-flex items-center justify-center gap-1.5 text-gray-500 text-sm font-medium hover:bg-gray-100 hover:text-gray-800 px-3 py-1.5 rounded-md disabled:opacity-50 disabled:pointer-events-none transition-colors";
 
+/** Look of a filter control (select / search box); highlighted when it has a value set. */
+export const filterControl = (active: boolean) =>
+  `border rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${
+    active ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-gray-700"
+  }`;
+
+/** Toggle chip for quick filters. */
+export const quickChip = (active: boolean) =>
+  `inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
+    active
+      ? "border-brand-500 bg-brand-50 text-brand-800"
+      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+  }`;
+
 export const card = "bg-white rounded-xl border border-gray-200/80 shadow-card";
 
 /** Adds an alpha channel to a #rrggbb hex color, for Jira-style tinted "lozenge" badge backgrounds. */

@@ -35,6 +35,11 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
                   >
                     {t.title}
                   </button>
+                  {t.parentTask && (
+                    <div className="text-[11px] font-normal text-subtle truncate max-w-xs" title={`Subtask of ${t.parentTask.title}`}>
+                      ↳ {t.parentTask.title}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   <StatusBadge label={statusOption?.label ?? t.status} color={statusOption?.color ?? "#6b7280"} />

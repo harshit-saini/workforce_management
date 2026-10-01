@@ -64,7 +64,12 @@ export const listTasksQuerySchema = z.object({
     .pipe(z.array(z.nativeEnum(StatusCategory)).min(1))
     .optional(),
   view: z.enum(["backlog", "board", "ongoing", "all"]).default("all"),
-  priority: z.nativeEnum(TaskPriority).optional(),
+  // One or several, comma-separated: "HIGH" or "HIGH,URGENT".
+  priority: z
+    .string()
+    .transform((v) => v.split(",").map((p) => p.trim()).filter(Boolean))
+    .pipe(z.array(z.nativeEnum(TaskPriority)).min(1))
+    .optional(),
   assigneeId: z.string().optional(),
   centerId: z.string().optional(),
   departmentId: z.string().optional(),
@@ -74,6 +79,13 @@ export const listTasksQuerySchema = z.object({
   search: z.string().optional(),
   parentTaskId: z.string().optional(),
   topLevelOnly: z.coerce.boolean().optional(),
+  // Hide a subtask when its parent task is also in the results (the parent card already shows its
+  // progress). A subtask whose parent is filtered out, or not visible to you, is still listed.
+  // Spelled out as a string: z.coerce.boolean() would read "false" as true.
+  collapseSubtasks: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
 });
 
 export const exportTasksQuerySchema = listTasksQuerySchema.omit({ page: true, pageSize: true });

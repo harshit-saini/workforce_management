@@ -91,13 +91,13 @@ export default function DashboardPage() {
               label="Still open"
               value={data.tasksOpen}
               accent="#946f00"
-              to={tasksHref({ view: "list", category: OPEN_CATEGORIES, center: centerId, department: departmentId })}
+              to={tasksHref({ view: "list", subtasks: "1", category: OPEN_CATEGORIES, center: centerId, department: departmentId })}
             />
             <StatCard
               label="Blocked"
               value={data.tasksBlocked}
               accent="#ae2e24"
-              to={tasksHref({ view: "list", category: "BLOCKED", center: centerId, department: departmentId })}
+              to={tasksHref({ view: "list", subtasks: "1", category: "BLOCKED", center: centerId, department: departmentId })}
             />
             <StatCard label="Hours logged" value={data.hoursLoggedTotal.toFixed(1)} accent="#5e4db2" />
             <StatCard

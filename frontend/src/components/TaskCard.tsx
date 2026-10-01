@@ -16,6 +16,12 @@ export function TaskCardContent({ task, actions }: { task: Task; actions?: React
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-card p-3 mb-2 hover:border-brand-300 hover:shadow-md transition-shadow duration-150">
+      {/* Shown when subtasks are on the board, so a card never loses its context. */}
+      {task.parentTask && (
+        <div className="text-[11px] text-subtle truncate mb-1" title={`Subtask of ${task.parentTask.title}`}>
+          ↳ {task.parentTask.title}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</div>
         {actions}

@@ -59,7 +59,7 @@ function Column({
       className={`flex-1 min-w-[260px] max-w-[320px] rounded-lg border-t-[3px] transition-colors duration-150 ${isOver ? "bg-brand-50" : "bg-gray-100/70"}`}
       style={{ borderTopColor: color }}
     >
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2.5 py-2.5 flex items-center justify-between sticky top-0">
+      <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide px-2.5 py-2.5 flex items-center justify-between sticky top-0">
         <span className="truncate">{label}</span>
         <span className="bg-gray-200 text-gray-600 rounded-full text-[11px] px-1.5 py-0.5 font-medium shrink-0 ml-2">{tasks.length}</span>
       </div>
