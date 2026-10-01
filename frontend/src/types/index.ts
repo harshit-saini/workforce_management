@@ -39,6 +39,7 @@ export interface Invite {
   centerId: string | null;
   departmentId: string | null;
   managerId: string | null;
+  managerName?: string | null;
   title: string | null;
   expiresAt: string;
   createdAt: string;

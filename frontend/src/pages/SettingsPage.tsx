@@ -5,6 +5,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
 import { Organization, StatusCategory, TaskStatusOption } from "@/types";
 import { useTaskStatuses } from "@/hooks/useLookups";
+import { useInstantEdit } from "@/hooks/useInstantEdit";
 import FormField, { inputClass } from "@/components/FormField";
 import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
@@ -50,22 +51,47 @@ export default function SettingsPage() {
     queryClient.invalidateQueries({ queryKey: ["task-statuses"] });
   }
 
-  const updateStatus = useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<Pick<TaskStatusOption, "label" | "category" | "color" | "isDefault" | "isRecurringDefault">>;
-    }) => api.patch(`/settings/task-statuses/${id}`, data),
-    onSuccess: invalidateStatuses,
-    // Re-sync so the controls go back to the saved value; the toast says why.
-    onError: invalidateStatuses,
-    meta: {
-      successMessage: (_: unknown, v: { id: string; data: { label?: string } }) =>
-        `Saved "${v.data.label ?? statusName(v.id)}"`,
-      errorTitle: (v: { id: string }) => `Couldn't update "${statusName(v.id)}"`,
+  type StatusEdit = {
+    id: string;
+    data: Partial<Pick<TaskStatusOption, "label" | "category" | "color" | "isDefault" | "isRecurringDefault">>;
+  };
+  const updateStatus = useInstantEdit<StatusEdit>({
+    keys: [["task-statuses"]],
+    request: ({ id, data }) => api.patch(`/settings/task-statuses/${id}`, data),
+    optimistic: (qc, { id, data }) =>
+      qc.setQueryData<TaskStatusOption[]>(["task-statuses"], (old) =>
+        old?.map((s) => {
+          if (s.id === id) return { ...s, ...data };
+          // The two "start here" radios are one-of-many.
+          if (data.isDefault) return { ...s, isDefault: false };
+          if (data.isRecurringDefault) return { ...s, isRecurringDefault: false };
+          return s;
+        })
+      ),
+    inverse: (qc, { id, data }) => {
+      const all = qc.getQueryData<TaskStatusOption[]>(["task-statuses"]) ?? [];
+      // Undoing "make this the default" means making the old default the default again.
+      if (data.isDefault) {
+        const prev = all.find((s) => s.isDefault);
+        return prev ? { id: prev.id, data: { isDefault: true } } : null;
+      }
+      if (data.isRecurringDefault) {
+        const prev = all.find((s) => s.isRecurringDefault);
+        return prev ? { id: prev.id, data: { isRecurringDefault: true } } : null;
+      }
+      const before = all.find((s) => s.id === id);
+      if (!before) return null;
+      const back: StatusEdit["data"] = {};
+      for (const key of Object.keys(data) as (keyof StatusEdit["data"])[]) (back as Record<string, unknown>)[key] = before[key];
+      return { id, data: back };
     },
+    successMessage: ({ id, data }) =>
+      data.isDefault
+        ? `New tasks now start in "${statusName(id)}"`
+        : data.isRecurringDefault
+          ? `Ongoing tasks now use "${statusName(id)}"`
+          : `Saved "${data.label ?? statusName(id)}"`,
+    errorTitle: ({ id }) => `Couldn't update "${statusName(id)}"`,
   });
 
   const deleteStatus = useMutation({
@@ -165,14 +191,10 @@ export default function SettingsPage() {
                   <IconChevronDown className="w-3.5 h-3.5" />
                 </button>
               </div>
+              <ColorInput value={s.color} onSave={(color) => updateStatus.mutate({ id: s.id, data: { color } })} />
               <input
-                type="color"
-                value={s.color}
-                onChange={(e) => updateStatus.mutate({ id: s.id, data: { color: e.target.value } })}
-                className="w-7 h-7 rounded cursor-pointer border-0 p-0"
-                title="Column color"
-              />
-              <input
+                key={`${s.id}-${s.label}`}
+                aria-label="Status label"
                 className="text-sm border border-transparent hover:border-gray-300 focus:border-brand-500 rounded px-1.5 py-1 outline-none"
                 defaultValue={s.label}
                 onBlur={(e) => {
@@ -253,6 +275,32 @@ export default function SettingsPage() {
 
       {showAdd && <AddStatusModal onClose={() => setShowAdd(false)} onCreated={invalidateStatuses} />}
     </div>
+  );
+}
+
+/**
+ * Dragging inside the browser's color picker fires a change on every movement. Hold the new color
+ * locally and save once it has settled (or the picker closes), so one drag is one save.
+ */
+function ColorInput({ value, onSave }: { value: string; onSave: (color: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  useEffect(() => {
+    if (draft === value) return;
+    const t = setTimeout(() => onSave(draft), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, value]);
+  return (
+    <input
+      type="color"
+      aria-label="Column color"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft !== value && onSave(draft)}
+      className="w-7 h-7 rounded cursor-pointer border-0 p-0"
+      title="Column color"
+    />
   );
 }
 

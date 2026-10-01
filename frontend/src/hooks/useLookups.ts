@@ -21,10 +21,11 @@ export function useDepartments() {
   });
 }
 
-export function useUsersList(params: Record<string, string | undefined> = {}) {
+/** Everyone in the organization (not one page of them), for pickers. */
+export function useUsersList() {
   return useQuery({
-    queryKey: ["users", params],
-    queryFn: async () => (await api.get<Paginated<User>>("/users", { params: { pageSize: 100, ...params } })).data,
+    queryKey: ["users", "directory"],
+    queryFn: async () => (await api.get<Paginated<User>>("/users/directory")).data,
     staleTime: LOOKUP_STALE_TIME,
   });
 }

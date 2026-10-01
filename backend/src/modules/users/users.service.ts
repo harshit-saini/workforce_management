@@ -66,6 +66,19 @@ export async function listUsers(organizationId: string, query: z.infer<typeof li
   return { items, meta: paginationMeta(total, query.page, query.pageSize) };
 }
 
+const DIRECTORY_LIMIT = 5000;
+
+/** Every person in the organization, unpaged, so pickers never stop at the first page. */
+export async function listDirectory(organizationId: string) {
+  const items = await prisma.user.findMany({
+    where: { organizationId, deletedAt: null },
+    select: userSelect,
+    orderBy: { name: "asc" },
+    take: DIRECTORY_LIMIT,
+  });
+  return { items, meta: paginationMeta(items.length, 1, Math.max(items.length, 1)) };
+}
+
 export async function getUser(organizationId: string, userId: string) {
   const user = await prisma.user.findFirst({ where: { id: userId, organizationId }, select: userSelect });
   if (!user) throw AppError.notFound("User not found");
@@ -105,6 +118,19 @@ export async function inviteUser(
   });
   if (existingInvite) throw AppError.conflict("An active invite already exists for this email");
 
+  // Never trust ids from the form: they must belong to this organization.
+  if (input.managerId) {
+    const manager = await prisma.user.findFirst({ where: { id: input.managerId, organizationId, deletedAt: null, status: "ACTIVE" } });
+    if (!manager) throw AppError.badRequest("Choose a manager from your organization");
+  }
+  if (input.centerId && !(await prisma.center.findFirst({ where: { id: input.centerId, organizationId } }))) {
+    throw AppError.badRequest("Choose a center from your organization");
+  }
+  if (input.departmentId && !(await prisma.department.findFirst({ where: { id: input.departmentId, organizationId } }))) {
+    throw AppError.badRequest("Choose a department from your organization");
+  }
+  const title = input.title?.trim() || undefined;
+
   const token = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -116,7 +142,7 @@ export async function inviteUser(
       centerId: input.centerId,
       departmentId: input.departmentId,
       managerId: input.managerId,
-      title: input.title,
+      title,
       token,
       expiresAt,
     },
@@ -134,7 +160,17 @@ export async function listInvites(organizationId: string) {
   });
   // Delivery isn't stored, so the list can't say whether each email arrived — but every invite
   // carries its link, so an admin can always share it by hand.
-  return invites.map((invite) => ({ ...invite, inviteUrl: inviteLink(invite.token), emailConfigured: config.email.enabled }));
+  const managers = await prisma.user.findMany({
+    where: { id: { in: invites.map((i) => i.managerId).filter((id): id is string => !!id) } },
+    select: { id: true, name: true },
+  });
+  const managerName = new Map(managers.map((m) => [m.id, m.name]));
+  return invites.map((invite) => ({
+    ...invite,
+    managerName: invite.managerId ? managerName.get(invite.managerId) ?? null : null,
+    inviteUrl: inviteLink(invite.token),
+    emailConfigured: config.email.enabled,
+  }));
 }
 
 /**
@@ -179,6 +215,18 @@ export async function adminUpdateUser(
 ) {
   const target = await prisma.user.findFirst({ where: { id: targetUserId, organizationId } });
   if (!target) throw AppError.notFound("User not found");
+
+  // Ids from the request must belong to this organization, never another tenant's.
+  if (input.managerId) {
+    const manager = await prisma.user.findFirst({ where: { id: input.managerId, organizationId, deletedAt: null } });
+    if (!manager) throw AppError.badRequest("Choose a manager from your organization");
+  }
+  if (input.centerId && !(await prisma.center.findFirst({ where: { id: input.centerId, organizationId } }))) {
+    throw AppError.badRequest("Choose a center from your organization");
+  }
+  if (input.departmentId && !(await prisma.department.findFirst({ where: { id: input.departmentId, organizationId } }))) {
+    throw AppError.badRequest("Choose a department from your organization");
+  }
 
   if (input.managerId !== undefined && input.managerId !== target.managerId) {
     const { wouldCreateCycle } = await import("../../lib/hierarchy.js");

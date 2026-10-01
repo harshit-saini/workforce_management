@@ -18,6 +18,11 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return usersService.listUsers(request.authUser.organizationId, query);
   });
 
+  // Everyone in the organization, unpaged, for pickers (assignee, manager, report filters).
+  fastify.get("/users/directory", async (request) => {
+    return usersService.listDirectory(request.authUser.organizationId);
+  });
+
   fastify.get("/users/:id", async (request) => {
     const { id } = request.params as { id: string };
     return usersService.getUser(request.authUser.organizationId, id);
