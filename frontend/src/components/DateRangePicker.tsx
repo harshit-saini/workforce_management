@@ -1,7 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 
-export type RangePreset = "this_week" | "last_week" | "last_2_weeks" | "custom";
+export type RangePreset = "last_7_days" | "this_week" | "last_week" | "last_2_weeks" | "custom";
 
 export interface RangeValue {
   preset: RangePreset;
@@ -10,6 +10,7 @@ export interface RangeValue {
 }
 
 const presets: { value: RangePreset; label: string }[] = [
+  { value: "last_7_days", label: "Last 7 days" },
   { value: "this_week", label: "This week" },
   { value: "last_week", label: "Last week" },
   { value: "last_2_weeks", label: "Last 2 weeks" },
@@ -27,7 +28,7 @@ export default function DateRangePicker({ value, onChange }: { value: RangeValue
           key={p.value}
           onClick={() => onChange({ preset: p.value, startDate: start, endDate: end })}
           className={clsx(
-            "px-3 py-1.5 rounded-md text-sm border",
+            "min-h-10 md:min-h-0 px-3 py-1.5 rounded-md text-sm border",
             value.preset === p.value
               ? "bg-brand-600 text-white border-brand-600"
               : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"

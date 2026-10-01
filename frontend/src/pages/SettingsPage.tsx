@@ -5,13 +5,16 @@ import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
 import { Organization, StatusCategory, TaskStatusOption } from "@/types";
 import { useTaskStatuses } from "@/hooks/useLookups";
+import { useInstantEdit } from "@/hooks/useInstantEdit";
 import FormField, { inputClass } from "@/components/FormField";
 import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ActionMenu from "@/components/ActionMenu";
 import StatusBadge from "@/components/StatusBadge";
 import { badgeColors, contrastRatio, hexToRgb } from "@/lib/color";
+import Dialog from "@/components/Dialog";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -50,22 +53,47 @@ export default function SettingsPage() {
     queryClient.invalidateQueries({ queryKey: ["task-statuses"] });
   }
 
-  const updateStatus = useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<Pick<TaskStatusOption, "label" | "category" | "color" | "isDefault" | "isRecurringDefault">>;
-    }) => api.patch(`/settings/task-statuses/${id}`, data),
-    onSuccess: invalidateStatuses,
-    // Re-sync so the controls go back to the saved value; the toast says why.
-    onError: invalidateStatuses,
-    meta: {
-      successMessage: (_: unknown, v: { id: string; data: { label?: string } }) =>
-        `Saved "${v.data.label ?? statusName(v.id)}"`,
-      errorTitle: (v: { id: string }) => `Couldn't update "${statusName(v.id)}"`,
+  type StatusEdit = {
+    id: string;
+    data: Partial<Pick<TaskStatusOption, "label" | "category" | "color" | "isDefault" | "isRecurringDefault">>;
+  };
+  const updateStatus = useInstantEdit<StatusEdit>({
+    keys: [["task-statuses"]],
+    request: ({ id, data }) => api.patch(`/settings/task-statuses/${id}`, data),
+    optimistic: (qc, { id, data }) =>
+      qc.setQueryData<TaskStatusOption[]>(["task-statuses"], (old) =>
+        old?.map((s) => {
+          if (s.id === id) return { ...s, ...data };
+          // The two "start here" radios are one-of-many.
+          if (data.isDefault) return { ...s, isDefault: false };
+          if (data.isRecurringDefault) return { ...s, isRecurringDefault: false };
+          return s;
+        })
+      ),
+    inverse: (qc, { id, data }) => {
+      const all = qc.getQueryData<TaskStatusOption[]>(["task-statuses"]) ?? [];
+      // Undoing "make this the default" means making the old default the default again.
+      if (data.isDefault) {
+        const prev = all.find((s) => s.isDefault);
+        return prev ? { id: prev.id, data: { isDefault: true } } : null;
+      }
+      if (data.isRecurringDefault) {
+        const prev = all.find((s) => s.isRecurringDefault);
+        return prev ? { id: prev.id, data: { isRecurringDefault: true } } : null;
+      }
+      const before = all.find((s) => s.id === id);
+      if (!before) return null;
+      const back: StatusEdit["data"] = {};
+      for (const key of Object.keys(data) as (keyof StatusEdit["data"])[]) (back as Record<string, unknown>)[key] = before[key];
+      return { id, data: back };
     },
+    successMessage: ({ id, data }) =>
+      data.isDefault
+        ? `New tasks now start in "${statusName(id)}"`
+        : data.isRecurringDefault
+          ? `Ongoing tasks now use "${statusName(id)}"`
+          : `Saved "${data.label ?? statusName(id)}"`,
+    errorTitle: ({ id }) => `Couldn't update "${statusName(id)}"`,
   });
 
   const deleteStatus = useMutation({
@@ -117,12 +145,12 @@ export default function SettingsPage() {
               dashboards and reports (e.g. completion rate looks at the "Done" category).
             </p>
           </div>
-          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline shrink-0">
+          <button onClick={() => setShowAdd(true)} className="inline-flex min-h-10 md:min-h-0 items-center gap-1 text-sm text-brand-600 hover:underline shrink-0">
             <IconPlus className="w-4 h-4" /> Add status
           </button>
         </div>
 
-        <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 gap-y-1 text-xs text-subtle uppercase px-1 mb-1">
+        <div className="hidden md:grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 gap-y-1 text-xs text-subtle uppercase px-1 mb-1">
           <span></span>
           <span></span>
           <span>Label</span>
@@ -146,12 +174,12 @@ export default function SettingsPage() {
 
         <div className="divide-y divide-gray-100">
           {statuses?.map((s, i) => (
-            <div key={s.id} className="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 py-2">
-              <div className="flex flex-col">
+            <div key={s.id} className="grid grid-cols-[auto_auto_1fr_auto] md:grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-x-3 gap-y-2 py-3 md:py-2">
+              <div className="flex md:flex-col">
                 <button
                   onClick={() => moveStatus(i, -1)}
                   disabled={i === 0}
-                  className="text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
+                  className="flex max-md:h-10 max-md:w-10 items-center justify-center text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move up"
                 >
                   <IconChevronUp className="w-3.5 h-3.5" />
@@ -159,21 +187,17 @@ export default function SettingsPage() {
                 <button
                   onClick={() => moveStatus(i, 1)}
                   disabled={!statuses || i === statuses.length - 1}
-                  className="text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
+                  className="flex max-md:h-10 max-md:w-10 items-center justify-center text-subtle hover:text-gray-700 disabled:opacity-20 leading-none"
                   aria-label="Move down"
                 >
                   <IconChevronDown className="w-3.5 h-3.5" />
                 </button>
               </div>
+              <ColorInput value={s.color} onSave={(color) => updateStatus.mutate({ id: s.id, data: { color } })} />
               <input
-                type="color"
-                value={s.color}
-                onChange={(e) => updateStatus.mutate({ id: s.id, data: { color: e.target.value } })}
-                className="w-7 h-7 rounded cursor-pointer border-0 p-0"
-                title="Column color"
-              />
-              <input
-                className="text-sm border border-transparent hover:border-gray-300 focus:border-brand-500 rounded px-1.5 py-1 outline-none"
+                key={`${s.id}-${s.label}`}
+                aria-label="Status label"
+                className="min-w-0 max-md:min-h-10 text-sm border border-transparent hover:border-gray-300 focus:border-brand-500 rounded px-1.5 py-1 max-md:py-2 outline-none"
                 defaultValue={s.label}
                 onBlur={(e) => {
                   if (e.target.value && e.target.value !== s.label) {
@@ -181,53 +205,82 @@ export default function SettingsPage() {
                   }
                 }}
               />
-              <select
-                value={s.category}
-                onChange={(e) => updateStatus.mutate({ id: s.id, data: { category: e.target.value as StatusCategory } })}
-                className="text-xs border border-gray-300 rounded px-1.5 py-1"
-              >
-                {Object.entries(categoryLabel).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="radio"
-                name="default-status"
-                checked={s.isDefault}
-                onChange={() => updateStatus.mutate({ id: s.id, data: { isDefault: true } })}
-                title="New tasks start here"
-              />
-              <input
-                type="radio"
-                name="recurring-default-status"
-                checked={s.isRecurringDefault}
-                onChange={() => updateStatus.mutate({ id: s.id, data: { isRecurringDefault: true } })}
-                title="Used for ongoing/recurring tasks"
-              />
-              {s.isDefault || s.isRecurringDefault ? (
-                // Wrapped in a span because disabled buttons don't show tooltips.
-                <span
-                  className="justify-self-end shrink-0"
-                  title={
-                    s.isDefault
-                      ? "New tasks start here. Make another status the default before deleting this one."
-                      : "Used for ongoing tasks. Make another status the ongoing default before deleting this one."
-                  }
+        {/* On a phone Delete lives in a menu so it can't be hit by accident. */}
+        <span className="md:hidden">
+          <ActionMenu
+            label={`More for ${s.label}`}
+            items={[
+              {
+                label: "Delete status…",
+                danger: true,
+                disabled: s.isDefault || s.isRecurringDefault,
+                title: s.isDefault
+                  ? "New tasks start here. Make another status the default before deleting this one."
+                  : s.isRecurringDefault
+                    ? "Used for ongoing tasks. Make another status the ongoing default before deleting this one."
+                    : undefined,
+                onSelect: () => setDeleting(s),
+              },
+            ]}
+          />
+        </span>
+              {/* Second line on a phone; on larger screens these join the row's columns. */}
+              <div className="col-span-4 flex flex-wrap items-center gap-x-4 gap-y-1 md:contents">
+                <select
+                  aria-label="Category"
+                  value={s.category}
+                  onChange={(e) => updateStatus.mutate({ id: s.id, data: { category: e.target.value as StatusCategory } })}
+                  className="min-h-10 md:min-h-0 text-sm md:text-xs border border-gray-300 rounded px-1.5 py-1"
                 >
-                  <button disabled className="text-xs text-red-600 opacity-40 cursor-not-allowed">
+                  {Object.entries(categoryLabel).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex min-h-10 md:min-h-0 items-center gap-2 text-sm text-gray-700" title="New tasks start here">
+                  <input
+                    type="radio"
+                    name="default-status"
+                    className="h-5 w-5 md:h-4 md:w-4"
+                    checked={s.isDefault}
+                    onChange={() => updateStatus.mutate({ id: s.id, data: { isDefault: true } })}
+                  />
+                  <span className="md:sr-only">Default</span>
+                </label>
+                <label className="flex min-h-10 md:min-h-0 items-center gap-2 text-sm text-gray-700" title="Used for ongoing/recurring tasks">
+                  <input
+                    type="radio"
+                    name="recurring-default-status"
+                    className="h-5 w-5 md:h-4 md:w-4"
+                    checked={s.isRecurringDefault}
+                    onChange={() => updateStatus.mutate({ id: s.id, data: { isRecurringDefault: true } })}
+                  />
+                  <span className="md:sr-only">Ongoing</span>
+                </label>
+                {s.isDefault || s.isRecurringDefault ? (
+                  // Wrapped in a span because disabled buttons don't show tooltips.
+                  <span
+                    className="hidden md:inline justify-self-end shrink-0"
+                    title={
+                      s.isDefault
+                        ? "New tasks start here. Make another status the default before deleting this one."
+                        : "Used for ongoing tasks. Make another status the ongoing default before deleting this one."
+                    }
+                  >
+                    <button disabled className="text-xs text-red-600 opacity-40 cursor-not-allowed">
+                      Delete
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setDeleting(s)}
+                    className="hidden md:inline text-xs text-red-600 hover:underline justify-self-end shrink-0"
+                  >
                     Delete
                   </button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => setDeleting(s)}
-                  className="text-xs text-red-600 hover:underline justify-self-end shrink-0"
-                >
-                  Delete
-                </button>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -253,6 +306,32 @@ export default function SettingsPage() {
 
       {showAdd && <AddStatusModal onClose={() => setShowAdd(false)} onCreated={invalidateStatuses} />}
     </div>
+  );
+}
+
+/**
+ * Dragging inside the browser's color picker fires a change on every movement. Hold the new color
+ * locally and save once it has settled (or the picker closes), so one drag is one save.
+ */
+function ColorInput({ value, onSave }: { value: string; onSave: (color: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  useEffect(() => {
+    if (draft === value) return;
+    const t = setTimeout(() => onSave(draft), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, value]);
+  return (
+    <input
+      type="color"
+      aria-label="Column color"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft !== value && onSave(draft)}
+      className="w-10 h-10 md:w-7 md:h-7 rounded cursor-pointer border-0 p-0"
+      title="Column color"
+    />
   );
 }
 
@@ -289,8 +368,8 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+    <Dialog label={"Add status"} size="sm" onClose={onClose} closeOnOutside={!(label)}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">Add status</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Label">
@@ -328,6 +407,6 @@ function AddStatusModal({ onClose, onCreated }: { onClose: () => void; onCreated
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

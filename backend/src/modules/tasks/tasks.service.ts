@@ -116,6 +116,13 @@ export async function getTaskOrThrow(organizationId: string, accessibleUserIds: 
   return task;
 }
 
+/** The single-task view adds the hours everyone has logged, so the drawer can show it against the estimate. */
+export async function getTaskDetail(organizationId: string, accessibleUserIds: string[] | null, taskId: string) {
+  const task = await getTaskOrThrow(organizationId, accessibleUserIds, taskId);
+  const logged = await prisma.taskLog.aggregate({ where: { taskId }, _sum: { hoursLogged: true } });
+  return { ...task, loggedHours: logged._sum.hoursLogged ?? 0 };
+}
+
 /**
  * Any org member can be assigned a task — assignment isn't restricted to a manager's reporting
  * scope. This only confirms the assignee is an active member of the same organization (never a

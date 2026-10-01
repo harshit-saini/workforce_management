@@ -4,27 +4,29 @@ import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
 import { useCenters } from "@/hooks/useLookups";
+import { patchCached, useInstantEdit } from "@/hooks/useInstantEdit";
+import { Center } from "@/types";
 import FormField, { inputClass } from "@/components/FormField";
 import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
 import { IconBuilding } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 
-export default function CentersPage() {
+export default function CentersPage({ embedded = false }: { embedded?: boolean }) {
   const centersQuery = useCenters();
   const centers = centersQuery.data;
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const toggleActive = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => api.patch(`/centers/${id}`, { isActive }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["centers"] }),
-    meta: {
-      successMessage: (_: unknown, v: { id: string; isActive: boolean }) =>
-        `${centerName(v.id)} ${v.isActive ? "activated" : "deactivated"}`,
-      errorTitle: (v: { id: string }) => `Couldn't update ${centerName(v.id)}`,
-    },
+  const toggleActive = useInstantEdit<{ id: string; isActive: boolean }>({
+    keys: [["centers"]],
+    request: ({ id, isActive }) => api.patch(`/centers/${id}`, { isActive }),
+    optimistic: (qc, v) => patchCached<Center>(qc, ["centers"], v.id, (c) => ({ ...c, isActive: v.isActive })),
+    inverse: (_qc, v) => ({ id: v.id, isActive: !v.isActive }),
+    successMessage: (v) => `${centerName(v.id)} ${v.isActive ? "activated" : "deactivated"}`,
+    errorTitle: (v) => `Couldn't update ${centerName(v.id)}`,
   });
 
   function centerName(id: string) {
@@ -41,8 +43,8 @@ export default function CentersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Centers</h1>
+      <div className={`flex items-center ${embedded ? "justify-end" : "justify-between"}`}>
+        {!embedded && <h1 className="text-lg font-semibold text-gray-900">Centers</h1>}
         <button onClick={() => setShowCreate(true)} className="bg-brand-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-brand-700">
           Add center
         </button>
@@ -71,31 +73,28 @@ export default function CentersPage() {
 
       <div className="grid md:grid-cols-2 gap-4">
         {centers?.map((c) => (
-          <button
+          <div
             key={c.id}
-            onClick={() => setSelected(c.id)}
-            className={`text-left bg-white rounded-xl border shadow-sm p-4 hover:border-brand-400 ${
+            className={`relative bg-white rounded-xl border shadow-sm hover:border-brand-400 ${
               selected === c.id ? "border-brand-500" : "border-gray-100"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-gray-900">{c.name}</div>
-                <div className="text-xs text-subtle">
-                  {c.code} · {c.timezone}
-                </div>
+            <button onClick={() => setSelected(c.id)} className="block w-full text-left p-4 pr-28 rounded-xl">
+              <div className="font-medium text-gray-900">{c.name}</div>
+              <div className="text-xs text-subtle">
+                {c.code} · {c.timezone}
               </div>
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleActive.mutate({ id: c.id, isActive: !c.isActive });
-                }}
-                className={`text-xs px-2 py-0.5 rounded-full ${c.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
-              >
-                {c.isActive ? "Active" : "Inactive"}
-              </span>
-            </div>
-          </button>
+            </button>
+            <button
+              onClick={() => toggleActive.mutate({ id: c.id, isActive: !c.isActive })}
+              title={c.isActive ? "Active. Click to deactivate" : "Inactive. Click to activate"}
+              className={`absolute top-4 right-4 text-xs px-2 py-0.5 rounded-full font-medium ${
+                c.isActive ? "bg-green-100 text-green-800 hover:bg-green-200" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {c.isActive ? "Active" : "Inactive"}
+            </button>
+          </div>
         ))}
       </div>
 
@@ -148,8 +147,8 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+    <Dialog label={"Add center"} size="sm" onClose={onClose} closeOnOutside={!(name || code || address)}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">Add center</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Name">
@@ -175,6 +174,6 @@ function CreateCenterModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -1,4 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import ReportsHeader from "@/components/ReportsHeader";
+import { CHART_COLORS } from "@/lib/chartColors";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format, formatDistanceToNow } from "date-fns";
 import PeriodStepper from "@/components/PeriodStepper";
@@ -47,6 +49,7 @@ export default function MonthlyReportPage() {
 
   return (
     <div className="space-y-4 max-w-3xl">
+      <ReportsHeader kind="monthly" scope={viewingOther ? "team" : "me"} />
       {viewingOther && (
         <Link to={`/reports/monthly/team?year=${year}&month=${month}`} className="text-xs text-brand-600 hover:underline">
           ← Team monthly rollup
@@ -54,7 +57,7 @@ export default function MonthlyReportPage() {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Monthly Report"}</h1>
+          <h2 className="text-base font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Your monthly report"}</h2>
           {report && (
             <div className="text-xs text-subtle mt-0.5">
               {isCurrentMonth || new Date(report.generatedAt) < new Date(year, month, 1) ? "Month still in progress · " : ""}
@@ -113,7 +116,7 @@ export default function MonthlyReportPage() {
                 <XAxis dataKey="weekStartDate" tickFormatter={(d) => format(new Date(d), "MMM d")} fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip labelFormatter={(d) => format(new Date(d), "MMM d, yyyy")} />
-                <Line type="monotone" dataKey="tasksCompleted" stroke="#3182f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="tasksCompleted" stroke={CHART_COLORS.primary} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>

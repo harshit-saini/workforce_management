@@ -56,7 +56,7 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[260px] max-w-[320px] rounded-lg border-t-[3px] transition-colors duration-150 ${isOver ? "bg-brand-50" : "bg-gray-100/70"}`}
+      className={`flex-1 min-w-[260px] max-w-[320px] max-md:flex-none max-md:basis-[85vw] max-md:max-w-none max-md:snap-start rounded-lg border-t-[3px] transition-colors duration-150 ${isOver ? "bg-brand-50" : "bg-gray-100/70"}`}
       style={{ borderTopColor: color }}
     >
       <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide px-2.5 py-2.5 flex items-center justify-between sticky top-0">
@@ -131,7 +131,7 @@ export default function KanbanBoard({
         },
       }}
       onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveTask(null)}>
-      <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+      <div className="flex gap-3 overflow-x-auto pb-2 items-start max-md:snap-x max-md:snap-mandatory max-md:scroll-px-4">
         {statuses.map((s) => (
           <Column
             key={s.key}

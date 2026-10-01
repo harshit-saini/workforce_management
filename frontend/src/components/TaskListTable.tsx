@@ -4,13 +4,26 @@ import DueDate from "@/components/DueDate";
 import StatusBadge from "@/components/StatusBadge";
 import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
+import { TaskCardContent } from "@/components/TaskCard";
 
 export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
   const { data: statuses } = useTaskStatuses();
   const isDone = useIsDone();
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200/80 shadow-card overflow-x-auto">
+    <>
+      {/* Phones get the board's card layout, stacked: a six-column table can't fit. */}
+      <ul className="md:hidden space-y-2" aria-label="Tasks">
+        {tasks.map((t) => (
+          <li key={t.id}>
+            <button type="button" onClick={() => onOpen(t.id)} className="block w-full text-left rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 [&>div]:mb-0">
+              <TaskCardContent task={t} showStatus />
+            </button>
+          </li>
+        ))}
+        {tasks.length === 0 && <li className="px-4 py-6 text-center text-subtle">No tasks found</li>}
+      </ul>
+    <div className="hidden md:block bg-white rounded-xl border border-gray-200/80 shadow-card overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
           <tr>
@@ -70,5 +83,6 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
         </tbody>
       </table>
     </div>
+    </>
   );
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Dialog from "@/components/Dialog";
 import { TaskAttachment } from "@/types";
 import { resolveFileUrl } from "@/lib/api";
 import { downloadFile } from "@/lib/download";
@@ -14,14 +15,6 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
   const [zoomIndex, setZoomIndex] = useState(0);
   const zoom = ZOOM_STEPS[zoomIndex];
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
   function zoomIn() {
     setZoomIndex((i) => Math.min(i + 1, ZOOM_STEPS.length - 1));
   }
@@ -33,10 +26,8 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-
-      <div className="relative bg-white rounded-xl shadow-popover w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+    <Dialog label={`Preview of ${attachment.fileName}`} size="xl" backdrop="dark" onClose={onClose} panelClassName="overflow-hidden">
+      <div className="flex max-h-[90vh] flex-col">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
           <div className="min-w-0">
             <div className="text-sm font-medium text-gray-800 truncate">{attachment.fileName}</div>
@@ -67,7 +58,7 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
             <button onClick={() => downloadFile(url, attachment.fileName)} className={btnSecondary}>
               <IconDownload className="w-4 h-4" /> Download
             </button>
-            <button onClick={onClose} className="text-subtle hover:text-gray-700 px-1" aria-label="Close">
+            <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900" aria-label="Close">
               <IconX className="w-5 h-5" />
             </button>
           </div>
@@ -97,6 +88,6 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

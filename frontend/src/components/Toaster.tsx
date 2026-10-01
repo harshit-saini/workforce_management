@@ -22,7 +22,7 @@ export default function Toaster() {
   return (
     <div
       aria-live="polite"
-      className="fixed z-50 bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-96 flex flex-col gap-2 pointer-events-none"
+      className="fixed z-[60] bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-96 flex flex-col gap-2 pointer-events-none"
     >
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} />

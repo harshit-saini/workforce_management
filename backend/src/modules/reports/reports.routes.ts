@@ -8,6 +8,8 @@ import {
   weeklyTeamSummaryQuerySchema,
   submitWeeklySchema,
   reviewWeeklySchema,
+  saveSummarySchema,
+  remindWeeklySchema,
   monthlyQuerySchema,
   monthlyTeamSummaryQuerySchema,
 } from "./reports.schemas.js";
@@ -66,6 +68,28 @@ export default async function reportsRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const input = submitWeeklySchema.parse(request.body);
     return reportsService.submitWeeklyReport(request.authUser.organizationId, request.authUser, id, input);
+  });
+
+  fastify.get("/reports/weekly/awaiting-review", async (request) => {
+    const count = await reportsService.countReportsAwaitingReview(request.authUser.organizationId, request.authUser);
+    return { count };
+  });
+
+  fastify.put("/reports/weekly/:id/summary", async (request) => {
+    const { id } = request.params as { id: string };
+    const input = saveSummarySchema.parse(request.body);
+    return reportsService.saveWeeklySummary(request.authUser.organizationId, request.authUser, id, input);
+  });
+
+  fastify.post("/reports/weekly/remind", async (request) => {
+    const input = remindWeeklySchema.parse(request.body);
+    const week = input.week ? parseDateParam(input.week) : new Date();
+    return reportsService.remindWeeklyReports(request.authUser.organizationId, request.authUser, input, week);
+  });
+
+  fastify.post("/reports/weekly/:id/unreview", async (request) => {
+    const { id } = request.params as { id: string };
+    return reportsService.undoWeeklyReview(request.authUser.organizationId, request.authUser, id);
   });
 
   fastify.post("/reports/weekly/:id/review", async (request) => {

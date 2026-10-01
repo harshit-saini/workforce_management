@@ -7,6 +7,7 @@ import FormField, { inputClass } from "@/components/FormField";
 import TagInput from "@/components/TagInput";
 import { Task, TaskPriority, TaskStatus } from "@/types";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
+import Dialog from "@/components/Dialog";
 
 interface Props {
   onClose: () => void;
@@ -81,8 +82,8 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
-      <div className="bg-white rounded-xl shadow-popover p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog label={parentTaskId ? "Add subtask" : "New task"} size="lg" onClose={onClose} closeOnOutside={!(title || description)}>
+      <div className="p-6">
         <h2 className="text-base font-semibold mb-4">{parentTaskId ? "Add subtask" : "New task"}</h2>
         <form onSubmit={onSubmit}>
           <FormField label="Title">
@@ -177,6 +178,6 @@ export default function TaskFormModal({ onClose, onCreated, onOpenCreated, paren
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }

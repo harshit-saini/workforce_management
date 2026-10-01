@@ -6,7 +6,8 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from "../..
 import { getDownlineUserIds, getReportingChainUp } from "../../lib/hierarchy.js";
 import { getStatusKeysByCategory } from "../../lib/taskStatuses.js";
 import { z } from "zod";
-import { submitWeeklySchema, reviewWeeklySchema } from "./reports.schemas.js";
+import { submitWeeklySchema, reviewWeeklySchema, saveSummarySchema, remindWeeklySchema } from "./reports.schemas.js";
+import { notifyUser } from "../../lib/notify.js";
 
 const STOPWORDS = new Set([
   "the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "for", "is", "was", "are", "were",
@@ -121,7 +122,28 @@ export async function getWeeklyReport(organizationId: string, userId: string, an
     listOverdueTasksForUser(organizationId, userId),
   ]);
 
-  return { ...report, completedTasks, overdueTasks };
+  const reviewer = report.reviewerId
+    ? await prisma.user.findUnique({ where: { id: report.reviewerId }, select: { id: true, name: true } })
+    : null;
+
+  return { ...report, reviewer, completedTasks, overdueTasks };
+}
+
+/** Autosave while writing: only the owner, and only while the report can still be edited. */
+export async function saveWeeklySummary(
+  organizationId: string,
+  actor: AuthUser,
+  reportId: string,
+  input: z.infer<typeof saveSummarySchema>
+) {
+  const report = await prisma.weeklyReport.findFirst({ where: { id: reportId, organizationId } });
+  if (!report) throw AppError.notFound("Weekly report not found");
+  if (report.userId !== actor.id) throw AppError.forbidden("You can only edit your own weekly report");
+  if (!EDITABLE_REPORT_STATUSES.includes(report.status)) {
+    throw AppError.conflict("This report has been submitted, so it can't be edited");
+  }
+  const updated = await prisma.weeklyReport.update({ where: { id: reportId }, data: { summary: input.summary } });
+  return { id: updated.id, summary: updated.summary, updatedAt: updated.updatedAt };
 }
 
 export async function submitWeeklyReport(
@@ -136,7 +158,15 @@ export async function submitWeeklyReport(
 
   return prisma.weeklyReport.update({
     where: { id: reportId },
-    data: { status: "SUBMITTED", summary: input.summary ?? report.summary, submittedAt: new Date() },
+    data: {
+      status: "SUBMITTED",
+      summary: input.summary ?? report.summary,
+      submittedAt: new Date(),
+      // A resubmission goes back to the queue; the earlier review no longer applies.
+      reviewerId: null,
+      reviewedAt: null,
+      managerComment: null,
+    },
   });
 }
 
@@ -148,15 +178,11 @@ export async function reviewWeeklyReport(
 ) {
   const report = await prisma.weeklyReport.findFirst({ where: { id: reportId, organizationId } });
   if (!report) throw AppError.notFound("Weekly report not found");
+  await assertCanReview(organizationId, actor, report.userId);
 
-  if (actor.role === "MANAGER") {
-    const chain = await getReportingChainUp(organizationId, report.userId);
-    if (!chain.includes(actor.id)) throw AppError.forbidden("You can only review reports of your reporting chain");
-  } else if (actor.role !== "ADMIN" && actor.role !== "OWNER") {
-    throw AppError.forbidden("You do not have permission to review this report");
-  }
+  if (report.status === "DRAFT") throw AppError.conflict("This report hasn't been submitted yet");
 
-  return prisma.weeklyReport.update({
+  const updated = await prisma.weeklyReport.update({
     where: { id: reportId },
     data: {
       status: input.status,
@@ -165,6 +191,98 @@ export async function reviewWeeklyReport(
       reviewedAt: new Date(),
     },
   });
+
+  if (input.status === "CHANGES_REQUESTED") {
+    await notifyUser({
+      organizationId,
+      userId: report.userId,
+      type: "WEEKLY_REPORT_DUE",
+      message: `${await actorName(actor.id)} sent your weekly report back${input.managerComment ? `: ${input.managerComment}` : " for changes"}`,
+      relatedReportId: reportId,
+      dedupeKey: `weekly-report-changes:${reportId}:${updated.reviewedAt?.getTime()}`,
+      cooldownMs: 0,
+    });
+  }
+  return updated;
+}
+
+/** Takes a review back (the Undo after approving or sending back), returning the report to the review queue. */
+export async function undoWeeklyReview(organizationId: string, actor: AuthUser, reportId: string) {
+  const report = await prisma.weeklyReport.findFirst({ where: { id: reportId, organizationId } });
+  if (!report) throw AppError.notFound("Weekly report not found");
+  await assertCanReview(organizationId, actor, report.userId);
+  if (report.status !== "APPROVED" && report.status !== "CHANGES_REQUESTED") {
+    throw AppError.conflict("There's no review to undo");
+  }
+  return prisma.weeklyReport.update({
+    where: { id: reportId },
+    data: { status: "SUBMITTED", managerComment: null, reviewerId: null, reviewedAt: null },
+  });
+}
+
+async function actorName(userId: string): Promise<string> {
+  return (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name ?? "Your manager";
+}
+
+async function assertCanReview(organizationId: string, actor: AuthUser, reportOwnerId: string) {
+  if (actor.role === "MANAGER") {
+    const chain = await getReportingChainUp(organizationId, reportOwnerId);
+    if (!chain.includes(actor.id)) throw AppError.forbidden("You can only review reports of your reporting chain");
+  } else if (actor.role !== "ADMIN" && actor.role !== "OWNER") {
+    throw AppError.forbidden("You do not have permission to review this report");
+  }
+}
+
+/** How many submitted weekly reports (recent weeks) are waiting for this person's review; 0 for anyone who can't review. */
+export async function countReportsAwaitingReview(organizationId: string, actor: AuthUser, now = new Date()) {
+  if (actor.role === "EMPLOYEE") return 0;
+  const userIds = await resolveTeamUserIds(organizationId, actor);
+  return prisma.weeklyReport.count({
+    where: {
+      organizationId,
+      status: "SUBMITTED",
+      userId: userIds ? { in: userIds.filter((id) => id !== actor.id) } : { not: actor.id },
+      weekStartDate: { gte: addDays(startOfWeek(now), -7 * 8) },
+    },
+  });
+}
+
+/** Reminds people who haven't submitted, using the same notification as the Monday reminder. */
+export async function remindWeeklyReports(
+  organizationId: string,
+  actor: AuthUser,
+  input: z.infer<typeof remindWeeklySchema>,
+  anyDateInWeek: Date
+) {
+  const teamIds = await resolveTeamUserIds(organizationId, actor);
+  const allowed = new Set(teamIds ?? (await prisma.user.findMany({ where: { organizationId, deletedAt: null }, select: { id: true } })).map((u) => u.id));
+  const weekStartDate = startOfWeek(anyDateInWeek);
+  let sent = 0;
+  let skipped = 0;
+  for (const userId of input.userIds) {
+    if (!allowed.has(userId)) {
+      skipped++;
+      continue;
+    }
+    const report = await generateWeeklyReport(organizationId, userId, anyDateInWeek);
+    // Only people who still owe the report; someone who submitted in the meantime isn't nagged.
+    if (!EDITABLE_REPORT_STATUSES.includes(report.status) || report.status === "CHANGES_REQUESTED") {
+      skipped++;
+      continue;
+    }
+    const delivered = await notifyUser({
+      organizationId,
+      userId,
+      type: "WEEKLY_REPORT_DUE",
+      message: `${await actorName(actor.id)} reminded you to submit your weekly report for the week of ${weekStartDate.toDateString().slice(4, 10)}`,
+      relatedReportId: report.id,
+      dedupeKey: `weekly-report-remind:${userId}:${weekStartDate.getTime()}`,
+      cooldownMs: 12 * 60 * 60 * 1000,
+    });
+    if (delivered) sent++;
+    else skipped++;
+  }
+  return { sent, skipped };
 }
 
 /**

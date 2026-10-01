@@ -9,7 +9,7 @@ import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
 import { IconLayers } from "@/components/icons";
 
-export default function DepartmentsPage() {
+export default function DepartmentsPage({ embedded = false }: { embedded?: boolean }) {
   const departmentsQuery = useDepartments();
   const departments = departmentsQuery.data;
   const [name, setName] = useState("");
@@ -31,7 +31,7 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-gray-900">Departments</h1>
+      {!embedded && <h1 className="text-lg font-semibold text-gray-900">Departments</h1>}
 
       <form onSubmit={onSubmit} className="flex items-end gap-2">
         <FormField label="New department">

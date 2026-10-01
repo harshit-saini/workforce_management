@@ -6,11 +6,14 @@ import ActionMenu from "@/components/ActionMenu";
 import Avatar from "@/components/Avatar";
 import PriorityBadge from "@/components/PriorityBadge";
 import DueDate from "@/components/DueDate";
-import { useIsDone } from "@/hooks/useLookups";
+import StatusBadge from "@/components/StatusBadge";
+import { useIsDone, useTaskStatuses } from "@/hooks/useLookups";
 
 /** Pure visual card, no drag hooks — used both by the real draggable card and the DragOverlay preview. */
-export function TaskCardContent({ task, actions }: { task: Task; actions?: ReactNode }) {
+export function TaskCardContent({ task, actions, showStatus }: { task: Task; actions?: ReactNode; showStatus?: boolean }) {
   const isDone = useIsDone();
+  const { data: statuses } = useTaskStatuses();
+  const statusOption = showStatus ? statuses?.find((s) => s.key === task.status) : undefined;
   const subtasksDone = task.subtasks?.filter((s) => s.status === "DONE").length ?? 0;
   const subtasksTotal = task.subtasks?.length ?? 0;
 
@@ -57,7 +60,11 @@ export function TaskCardContent({ task, actions }: { task: Task; actions?: React
           {(task.priority === "HIGH" || task.priority === "URGENT") && <PriorityBadge priority={task.priority} />}
           <DueDate dueDate={task.dueDate} done={isDone(task)} />
         </div>
-        <Avatar name={task.assignee?.name} size="xs" />
+        <div className="flex items-center gap-1.5 shrink-0 text-xs text-gray-600">
+          {showStatus && statusOption && <StatusBadge label={statusOption.label} color={statusOption.color} />}
+          {showStatus && <span className="max-w-[7rem] truncate">{task.assignee?.name ?? "Unassigned"}</span>}
+          <Avatar name={task.assignee?.name} size="xs" />
+        </div>
       </div>
     </div>
   );

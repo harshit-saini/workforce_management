@@ -1,69 +1,72 @@
-import { useRef, useState, FormEvent } from "react";
+import { ReactNode, useEffect, useId, useRef, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
-import { Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachment } from "@/types";
-import TaskFormModal from "@/components/TaskFormModal";
+import { Paginated, Task, TaskStatus, TaskPriority, TaskComment, TaskActivity, TaskAttachment } from "@/types";
 import AttachmentPreview from "@/components/AttachmentPreview";
 import AttachmentViewerModal from "@/components/AttachmentViewerModal";
-import PriorityBadge from "@/components/PriorityBadge";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import Avatar from "@/components/Avatar";
-import { IconChevronDown, IconLink, IconPlus, IconUpload, IconX } from "@/components/icons";
+import { IconChevronDown, IconLink, IconUpload } from "@/components/icons";
+import Dialog from "@/components/Dialog";
 import { btnPrimary, btnSecondary } from "@/lib/ui";
 import { badgeColors } from "@/lib/color";
 import DueDate from "@/components/DueDate";
 import TagInput from "@/components/TagInput";
+import InlineText, { fieldClass } from "@/components/InlineText";
 import { toast } from "@/lib/toast";
 import { taskHref } from "@/lib/links";
-import { getErrorMessage } from "@/lib/errors";
 import QueryError from "@/components/QueryError";
 import { useCenters, useDepartments, useIsDone, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
 
-interface EditForm {
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  assigneeId: string;
-  centerId: string;
-  departmentId: string;
-  dueDate: string;
-  estimatedHours: string;
-  tags: string[];
-}
+/** One field saved on its own: what to send, and what to show straight away while it travels. */
+type FieldSave = { label: string; body: Record<string, unknown>; optimistic: Partial<Task> };
 
-function toEditForm(task: Task): EditForm {
-  return {
-    title: task.title,
-    description: task.description ?? "",
-    priority: task.priority,
-    assigneeId: task.assigneeId ?? "",
-    centerId: task.centerId ?? "",
-    departmentId: task.departmentId ?? "",
-    dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
-    estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : "",
-    tags: task.tags.map((t) => t.label),
-  };
-}
+const PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: "LOW", label: "Low" },
+  { value: "MEDIUM", label: "Medium" },
+  { value: "HIGH", label: "High" },
+  { value: "URGENT", label: "Urgent" },
+];
 
-export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+export default function TaskDetailDrawer({
+  taskId,
+  onClose,
+  onOpenTask,
+}: {
+  taskId: string;
+  onClose: () => void;
+  /** Jump to another task (a subtask or the parent) without closing the panel. */
+  onOpenTask?: (id: string) => void;
+}) {
   const queryClient = useQueryClient();
-  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [viewingAttachment, setViewingAttachment] = useState<TaskAttachment | null>(null);
   const [comment, setComment] = useState("");
+  const [newSubtask, setNewSubtask] = useState("");
   /** Set while asking why the task is blocked, before moving it to a Blocked-category status. */
   const [pendingBlockedStatus, setPendingBlockedStatus] = useState<TaskStatus | null>(null);
   const [blockedReasonDraft, setBlockedReasonDraft] = useState("");
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [logHours, setLogHours] = useState("8");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uid = useId();
+  const fid = (name: string) => `${uid}-${name}`;
 
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
     queryFn: async () => (await api.get<Task>(`/tasks/${taskId}`)).data,
+    // The list the person just clicked from already has this task, so show it while the full copy loads.
+    placeholderData: () => {
+      for (const [, data] of queryClient.getQueriesData<Paginated<Task>>({ queryKey: ["tasks"] })) {
+        const hit = data?.items?.find((t) => t.id === taskId);
+        if (hit) return hit;
+      }
+      return undefined;
+    },
   });
   const task = taskQuery.data;
 
@@ -87,6 +90,45 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     queryClient.invalidateQueries({ queryKey: ["task-activity", taskId] });
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
   }
+
+  // Anything typed but not yet sent. Fields that save when you leave them never count.
+  const hasDraft = !!comment.trim() || !!newSubtask.trim() || (!!pendingBlockedStatus && !!blockedReasonDraft.trim());
+  function requestClose() {
+    if (hasDraft) setConfirmingClose(true);
+    else onClose();
+  }
+  function draftSummary(): string {
+    const parts = [];
+    if (comment.trim()) parts.push("a comment");
+    if (newSubtask.trim()) parts.push("a subtask");
+    if (pendingBlockedStatus && blockedReasonDraft.trim()) parts.push("a blocked reason");
+    return parts.join(" and ");
+  }
+
+  /** Each detail saves the moment it changes, shows the new value straight away, and rolls back if it fails. */
+  const saveField = useMutation({
+    mutationFn: (v: FieldSave) => api.patch(`/tasks/${taskId}`, v.body),
+    onMutate: async (v) => {
+      setSaveState("saving");
+      const previous = queryClient.getQueryData<Task>(["task", taskId]);
+      if (previous) queryClient.setQueryData<Task>(["task", taskId], { ...previous, ...v.optimistic });
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => {
+      setSaveState("idle");
+      if (ctx?.previous) queryClient.setQueryData(["task", taskId], ctx.previous);
+    },
+    onSuccess: () => setSaveState("saved"),
+    onSettled: invalidate,
+    meta: { errorTitle: (v: FieldSave) => `Couldn't update the ${v.label}` },
+  });
+
+  useEffect(() => {
+    if (saveState !== "saved") return;
+    const t = setTimeout(() => setSaveState("idle"), 2000);
+    return () => clearTimeout(t);
+  }, [saveState]);
 
   const addComment = useMutation({
     mutationFn: (vars: { comment: string }) => api.post(`/tasks/${taskId}/comments`, vars),
@@ -121,6 +163,53 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     }
     setPendingBlockedStatus(null);
     changeStatus.mutate({ status: key });
+  }
+
+  const addSubtask = useMutation({
+    // Starts out like its parent, so a subtask lands with the same person, center and department.
+    mutationFn: (title: string) =>
+      api.post(`/tasks`, {
+        title,
+        parentTaskId: taskId,
+        assigneeId: task?.assigneeId || undefined,
+        centerId: task?.centerId || undefined,
+        departmentId: task?.departmentId || undefined,
+      }),
+    onSuccess: () => {
+      setNewSubtask("");
+      invalidate();
+    },
+    meta: { errorTitle: "Couldn't add the subtask" },
+  });
+
+  const toggleSubtask = useMutation({
+    mutationFn: (vars: { id: string; title: string; done: boolean }) =>
+      api.patch(`/tasks/${vars.id}`, { status: subtaskStatusKey(vars.done) }),
+    // Tick or untick shows straight away; a failure puts it back.
+    onMutate: async (vars) => {
+      // Write first, then cancel: awaiting before the write lets the controlled checkbox snap back for a frame.
+      const previous = queryClient.getQueryData<Task>(["task", taskId]);
+      if (previous) {
+        const status = subtaskStatusKey(vars.done);
+        queryClient.setQueryData<Task>(["task", taskId], {
+          ...previous,
+          subtasks: previous.subtasks?.map((s) => (s.id === vars.id && status ? { ...s, status } : s)),
+        });
+      }
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["task", taskId], ctx.previous);
+    },
+    onSettled: invalidate,
+    meta: { errorTitle: (v: { title: string }) => `Couldn't update "${v.title}"` },
+  });
+
+  /** Ticking sends a subtask to the first Done status; unticking sends it back to the default one. */
+  function subtaskStatusKey(done: boolean): string | undefined {
+    if (done) return [...(statuses ?? [])].sort((a, b) => a.order - b.order).find((s) => s.category === "DONE")?.key;
+    return statuses?.find((s) => s.isDefault)?.key;
   }
 
   async function copyLink() {
@@ -160,413 +249,500 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     },
   });
 
-  const saveEdit = useMutation({
-    mutationFn: (form: EditForm) =>
-      api.patch(`/tasks/${taskId}`, {
-        title: form.title,
-        description: form.description || null,
-        priority: form.priority,
-        assigneeId: form.assigneeId || null,
-        centerId: form.centerId || null,
-        departmentId: form.departmentId || null,
-        dueDate: form.dueDate || null,
-        estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : null,
-        tags: form.tags,
-      }),
-    onSuccess: () => {
-      setIsEditing(false);
-      invalidate();
-    },
-    meta: { successMessage: "Task updated", suppressErrorToast: true },
-  });
-
-  async function onCommentSubmit(e: FormEvent) {
+  function onCommentSubmit(e: FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
     addComment.mutate({ comment });
   }
 
-  function startEditing() {
-    if (!task) return;
-    setEditForm(toEditForm(task));
-    setIsEditing(true);
+  function onSubtaskSubmit(e: FormEvent) {
+    e.preventDefault();
+    const title = newSubtask.trim();
+    if (title && !addSubtask.isPending) addSubtask.mutate(title);
   }
 
-  function onEditSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (editForm) saveEdit.mutate(editForm);
-  }
+  const shell = (children: ReactNode, withActions = true) => (
+    <>
+      <Dialog
+        variant="sheet"
+        label="Task details"
+        title="Task"
+        onClose={requestClose}
+        headerActions={
+          withActions && (
+            <button
+              onClick={copyLink}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900 whitespace-nowrap"
+              title="Copy a link to this task"
+            >
+              <IconLink className="w-3.5 h-3.5" /> Copy link
+            </button>
+          )
+        }
+      >
+        {children}
+      </Dialog>
+      {confirmingClose && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          description={`You've typed ${draftSummary() || "something"} that hasn't been saved. Closing now throws it away.`}
+          confirmLabel="Discard"
+          tone="danger"
+          onConfirm={onClose}
+          onCancel={() => setConfirmingClose(false)}
+        />
+      )}
+    </>
+  );
 
   if (!task) {
     // Open the drawer straight away so the click registers, then show loading or the failure.
-    return (
-      <div className="fixed inset-0 z-40 flex justify-end">
-        <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-        <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
-            <IconX className="w-5 h-5" />
-          </button>
-          {taskQuery.isError ? (
-            <QueryError
-              className="mt-10"
-              title="Couldn't load this task"
-              error={taskQuery.error}
-              onRetry={() => taskQuery.refetch()}
-              retrying={taskQuery.isFetching}
-            />
-          ) : (
-            <div className="text-sm text-subtle mt-1">Loading task…</div>
-          )}
+    return shell(
+      taskQuery.isError ? (
+        <QueryError
+          className="mt-10"
+          title="Couldn't load this task"
+          error={taskQuery.error}
+          onRetry={() => taskQuery.refetch()}
+          retrying={taskQuery.isFetching}
+        />
+      ) : (
+        <div aria-busy="true" className="animate-pulse">
+          <div className="h-6 w-2/3 rounded bg-gray-100 mt-1" />
+          <div className="h-5 w-24 rounded bg-gray-100 mt-4" />
+          <div className="h-16 rounded bg-gray-100 mt-6" />
+          <div className="space-y-2 mt-6">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-6 rounded bg-gray-100" />
+            ))}
+          </div>
+          <div className="text-sm text-subtle mt-4">Loading task…</div>
         </div>
-      </div>
+      ),
+      false
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={onClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
-          <IconX className="w-5 h-5" />
-        </button>
+  const blocked = statuses?.find((s) => s.key === task.status)?.category === "BLOCKED";
+  const subtasks = task.subtasks ?? [];
+  const doneSubtasks = subtasks.filter((s) => isDone({ status: s.status })).length;
+  const logged = task.loggedHours ?? 0;
+  const overEstimate = task.estimatedHours != null && logged > task.estimatedHours;
 
-        {!isEditing ? (
-          <>
-            <div className="flex items-start justify-between pr-8 gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">{task.title}</h2>
-              <div className="shrink-0 flex items-center gap-3 mt-1">
-                <button
-                  onClick={copyLink}
-                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 whitespace-nowrap"
-                  title="Copy a link to this task"
-                >
-                  <IconLink className="w-3.5 h-3.5" /> Copy link
-                </button>
-                <button onClick={startEditing} className="text-xs text-brand-600 hover:underline whitespace-nowrap">
-                  Edit
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-2">
-              <StatusPicker
-                value={pendingBlockedStatus ?? task.status}
-                options={(statuses ?? []).filter((s) => !s.isRecurringDefault || task.isRecurring || s.key === task.status)}
-                disabled={changeStatus.isPending}
-                onChange={pickStatus}
-              />
-              <PriorityBadge priority={task.priority} showLabel />
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-gray-100">
-                <Avatar name={task.assignee?.name} size="xs" />
-                {task.assignee?.name ?? "Unassigned"}
-              </span>
-              {task.center && <span className="px-2 py-0.5 rounded bg-gray-100">{task.center.name}</span>}
-              <DueDate dueDate={task.dueDate} done={isDone(task)} full />
-            </div>
-            {pendingBlockedStatus && (
-              <form
-                className="mt-3 rounded-md border border-red-200 bg-red-50 p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (blockedReasonDraft.trim()) {
-                    changeStatus.mutate({ status: pendingBlockedStatus, blockedReason: blockedReasonDraft.trim() });
-                  }
-                }}
-              >
-                <label className="block text-xs font-medium text-red-800 mb-1" htmlFor="blocked-reason">
-                  What's blocking this?
-                </label>
-                <input
-                  id="blocked-reason"
-                  autoFocus
-                  value={blockedReasonDraft}
-                  onChange={(e) => setBlockedReasonDraft(e.target.value)}
-                  placeholder="e.g. Waiting on the client's sign-off"
-                  className="w-full border border-red-200 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
-                />
-                <div className="flex gap-2 mt-2">
-                  <button type="submit" disabled={!blockedReasonDraft.trim() || changeStatus.isPending} className={btnPrimary}>
-                    Move to {statusLabel(pendingBlockedStatus)}
-                  </button>
-                  <button type="button" onClick={() => setPendingBlockedStatus(null)} className={btnSecondary}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-            {!pendingBlockedStatus &&
-              task.blockedReason &&
-              statuses?.find((s) => s.key === task.status)?.category === "BLOCKED" && (
-                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                  <span className="font-medium">Blocked:</span> {task.blockedReason}
-                </div>
-              )}
-            {task.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {task.tags.map((t) => (
-                  <span key={t.id} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-                    {t.label}
-                  </span>
-                ))}
-              </div>
-            )}
-            {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
-          </>
-        ) : (
-          <form onSubmit={onEditSubmit} className="pr-8">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Edit task</h3>
-            <input
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2 font-medium"
-              value={editForm!.title}
-              onChange={(e) => setEditForm({ ...editForm!, title: e.target.value })}
-              required
-            />
-            <textarea
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
-              rows={3}
-              placeholder="Description"
-              value={editForm!.description}
-              onChange={(e) => setEditForm({ ...editForm!, description: e.target.value })}
-            />
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <label className="text-xs text-gray-500">
-                Priority
-                <select
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.priority}
-                  onChange={(e) => setEditForm({ ...editForm!, priority: e.target.value as TaskPriority })}
-                >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="URGENT">Urgent</option>
-                </select>
-              </label>
-              <label className="text-xs text-gray-500">
-                Assignee
-                <select
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.assigneeId}
-                  onChange={(e) => setEditForm({ ...editForm!, assigneeId: e.target.value })}
-                >
-                  <option value="">Unassigned</option>
-                  {users?.items.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs text-gray-500">
-                Center
-                <select
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.centerId}
-                  onChange={(e) => setEditForm({ ...editForm!, centerId: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {centers?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs text-gray-500">
-                Department
-                <select
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.departmentId}
-                  onChange={(e) => setEditForm({ ...editForm!, departmentId: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {departments?.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs text-gray-500">
-                Due date
-                <input
-                  type="date"
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.dueDate}
-                  onChange={(e) => setEditForm({ ...editForm!, dueDate: e.target.value })}
-                />
-              </label>
-              <label className="text-xs text-gray-500">
-                Estimated hours
-                <input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mt-0.5"
-                  value={editForm!.estimatedHours}
-                  onChange={(e) => setEditForm({ ...editForm!, estimatedHours: e.target.value })}
-                />
-              </label>
-            </div>
-            <div className="mb-3">
-              <span className="text-xs text-gray-500">Tags</span>
-              <div className="mt-0.5">
-                <TagInput value={editForm!.tags} onChange={(tags) => setEditForm({ ...editForm!, tags })} />
-              </div>
-            </div>
-            {saveEdit.isError && (
-              <p className="text-xs text-red-600 mb-2">Couldn't save changes: {getErrorMessage(saveEdit.error)}</p>
-            )}
-            <div className="flex gap-2">
-              <button type="submit" disabled={saveEdit.isPending} className={btnPrimary}>
-                Save
-              </button>
-              <button type="button" onClick={() => setIsEditing(false)} className={btnSecondary}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
+  function save(label: string, body: Record<string, unknown>, optimistic: Partial<Task>) {
+    saveField.mutate({ label, body, optimistic });
+  }
 
-        {/* Subtasks */}
-        <section className="mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-700">
-              Subtasks {task.subtasks && task.subtasks.length > 0 && `(${task.subtasks.filter((s) => s.status === "DONE").length}/${task.subtasks.length})`}
-            </h3>
-            <button onClick={() => setShowSubtaskForm(true)} className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
-              <IconPlus className="w-3.5 h-3.5" /> Add subtask
-            </button>
-          </div>
-          <div className="space-y-1">
-            {task.subtasks?.map((s) => (
-              <div key={s.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-md px-3 py-1.5">
-                <span className={s.status === "DONE" ? "line-through text-subtle" : "text-gray-700"}>{s.title}</span>
-                <span className="text-xs text-subtle">{s.status}</span>
-              </div>
-            ))}
-            {(!task.subtasks || task.subtasks.length === 0) && <div className="text-xs text-subtle">No subtasks</div>}
-          </div>
-        </section>
-
-        {/* Comment (status is changed from the picker at the top) */}
-        <section className="mt-6 border-t border-gray-100 pt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Comment</h3>
-          <form onSubmit={onCommentSubmit}>
-            <textarea
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
-              rows={3}
-              placeholder="What did you do? Add a comment…"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-            <button type="submit" disabled={!comment.trim() || addComment.isPending} className={btnPrimary}>
-              {addComment.isPending ? "Posting…" : "Comment"}
-            </button>
-          </form>
-        </section>
-
-        {/* Time log */}
-        <section className="mt-6 border-t border-gray-100 pt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Log time</h3>
-          <div className="flex items-center gap-2 flex-wrap">
-            <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
-            <input
-              type="number"
-              min={0.25}
-              max={24}
-              step={0.25}
-              value={logHours}
-              onChange={(e) => setLogHours(e.target.value)}
-              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-20"
-            />
-            <span className="text-xs text-subtle">hours</span>
-            <button
-              onClick={() => logTime.mutate({ date: logDate, hoursLogged: Number(logHours) })}
-              disabled={logTime.isPending}
-              className={btnSecondary}
-            >
-              Log
-            </button>
-            <button
-              onClick={() => {
-                setLogHours("8");
-                logTime.mutate({ date: logDate, hoursLogged: 8 });
-              }}
-              disabled={logTime.isPending}
-              className={btnSecondary}
-            >
-              Log full day (8h)
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1.5">Logging the same day again replaces that day's hours.</p>
-        </section>
-
-        {/* Attachments */}
-        <section className="mt-6 border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-700">Attachments</h3>
-            <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
-              <IconUpload className="w-3.5 h-3.5" /> Upload file
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadAttachment.mutate(file);
-                e.target.value = "";
-              }}
-            />
-          </div>
-          {uploadAttachment.isPending && <div className="text-xs text-subtle mb-2">Uploading…</div>}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {task.attachments?.map((att) => (
-              <AttachmentPreview key={att.id} attachment={att} onClick={() => setViewingAttachment(att)} />
-            ))}
-          </div>
-          {(!task.attachments || task.attachments.length === 0) && (
-            <div className="text-xs text-subtle">No files attached</div>
-          )}
-        </section>
-
-        {/* Activity */}
-        <section className="mt-6 border-t border-gray-100 pt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Activity</h3>
-          <div className="space-y-3">
-            {activity?.map((item) => (
-              <div key={item.id} className="text-sm border-l-2 border-gray-100 pl-3">
-                {item.kind === "comment" ? (
-                  <>
-                    <div className="text-gray-800">
-                      <span className="font-medium">{item.user.name}</span>
-                      {item.statusChangedTo && (
-                        <span className="text-xs text-brand-600 ml-2">→ moved to {statusLabel(item.statusChangedTo)}</span>
-                      )}
-                    </div>
-                    <div className="text-gray-600">{item.comment}</div>
-                  </>
-                ) : (
-                  <div className="text-gray-600">
-                    <span className="font-medium text-gray-800">{item.user.name}</span> {item.message}
-                  </div>
-                )}
-                <div className="text-[11px] text-subtle mt-0.5">
-                  {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
-                </div>
-              </div>
-            ))}
-            {(!activity || activity.length === 0) && <div className="text-xs text-subtle">No activity yet</div>}
-          </div>
-        </section>
+  return shell(
+    <>
+      {task.parentTask && (
+        <div className="mb-1 text-xs text-gray-600">
+          Parent:{" "}
+          <button
+            onClick={() => onOpenTask?.(task.parentTask!.id)}
+            className="text-brand-700 hover:underline font-medium"
+            title="Open the parent task"
+          >
+            {task.parentTask.title}
+          </button>
+        </div>
+      )}
+      <h2 className="sr-only">{task.title}</h2>
+      <div className="flex items-start justify-between gap-2">
+        <InlineText
+          value={task.title}
+          ariaLabel="Title"
+          required
+          maxLength={200}
+          className="!text-lg font-semibold -ml-2 flex-1 min-w-0"
+          onCommit={(title) => save("title", { title }, { title })}
+        />
+      </div>
+      <div className="flex items-center gap-3 mt-2">
+        <StatusPicker
+          value={pendingBlockedStatus ?? task.status}
+          options={(statuses ?? []).filter((s) => !s.isRecurringDefault || task.isRecurring || s.key === task.status)}
+          disabled={changeStatus.isPending}
+          onChange={pickStatus}
+        />
+        <span role="status" className="text-xs text-subtle min-h-4">
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : ""}
+        </span>
       </div>
 
-      {showSubtaskForm && (
-        <TaskFormModal parentTaskId={taskId} onClose={() => setShowSubtaskForm(false)} onCreated={invalidate} />
+      {pendingBlockedStatus && (
+        <form
+          className="mt-3 rounded-md border border-red-200 bg-red-50 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (blockedReasonDraft.trim()) {
+              changeStatus.mutate({ status: pendingBlockedStatus, blockedReason: blockedReasonDraft.trim() });
+            }
+          }}
+        >
+          <label className="block text-xs font-medium text-red-800 mb-1" htmlFor="blocked-reason">
+            What's blocking this?
+          </label>
+          <input
+            id="blocked-reason"
+            autoFocus
+            value={blockedReasonDraft}
+            onChange={(e) => setBlockedReasonDraft(e.target.value)}
+            placeholder="e.g. Waiting on the client's sign-off"
+            className="w-full border border-red-200 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+          />
+          <div className="flex gap-2 mt-2">
+            <button type="submit" disabled={!blockedReasonDraft.trim() || changeStatus.isPending} className={btnPrimary}>
+              Move to {statusLabel(pendingBlockedStatus)}
+            </button>
+            <button type="button" onClick={() => setPendingBlockedStatus(null)} className={btnSecondary}>
+              Cancel
+            </button>
+          </div>
+        </form>
       )}
+      {!pendingBlockedStatus && blocked && (
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="group" aria-label="Blocked">
+          <label htmlFor={fid("blocked")} className="block text-xs font-semibold uppercase tracking-wide text-red-800">
+            Blocked
+          </label>
+          <InlineText
+            id={fid("blocked")}
+            value={task.blockedReason ?? ""}
+            ariaLabel="Blocked reason"
+            placeholder="Add why it's blocked"
+            required
+            className="-ml-2 mt-0.5 !text-red-900 placeholder:text-red-700"
+            onCommit={(blockedReason) => save("blocked reason", { blockedReason }, { blockedReason })}
+          />
+        </div>
+      )}
+
+      <div className="mt-4">
+        <InlineText
+          multiline
+          value={task.description ?? ""}
+          ariaLabel="Description"
+          placeholder="Add a description…"
+          className="-ml-2 text-gray-700"
+          onCommit={(description) => save("description", { description: description || null }, { description: description || null })}
+        />
+      </div>
+
+      {/* Details: every value saves as soon as it changes. */}
+      <section className="mt-5" aria-label="Details">
+        <h3 className="text-sm font-semibold text-gray-700 mb-1">Details</h3>
+        <dl className="-mx-2">
+          <DetailRow label="Priority" htmlFor={fid("priority")}>
+            <select
+              id={fid("priority")}
+              className={fieldClass}
+              value={task.priority}
+              onChange={(e) => {
+                const priority = e.target.value as TaskPriority;
+                save("priority", { priority }, { priority });
+              }}
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </DetailRow>
+          <DetailRow label="Assignee" htmlFor={fid("assignee")}>
+            <div className="flex items-center gap-1">
+              <Avatar name={task.assignee?.name} size="xs" />
+              <select
+                id={fid("assignee")}
+                className={fieldClass}
+                value={task.assigneeId ?? ""}
+                onChange={(e) => {
+                  const assigneeId = e.target.value || null;
+                  const u = users?.items.find((x) => x.id === assigneeId);
+                  save(
+                    "assignee",
+                    { assigneeId },
+                    { assigneeId, assignee: u ? { id: u.id, name: u.name, avatarUrl: u.avatarUrl ?? null } : null }
+                  );
+                }}
+              >
+                <option value="">Unassigned</option>
+                {users?.items.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </DetailRow>
+          <DetailRow label="Center" htmlFor={fid("center")}>
+            <select
+              id={fid("center")}
+              className={fieldClass}
+              value={task.centerId ?? ""}
+              onChange={(e) => {
+                const centerId = e.target.value || null;
+                const c = centers?.find((x) => x.id === centerId);
+                save("center", { centerId }, { centerId, center: c ? { id: c.id, name: c.name, code: c.code } : null });
+              }}
+            >
+              <option value="">None</option>
+              {centers?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </DetailRow>
+          <DetailRow label="Department" htmlFor={fid("department")}>
+            <select
+              id={fid("department")}
+              className={fieldClass}
+              value={task.departmentId ?? ""}
+              onChange={(e) => {
+                const departmentId = e.target.value || null;
+                const d = departments?.find((x) => x.id === departmentId);
+                save("department", { departmentId }, { departmentId, department: d ? { id: d.id, name: d.name } : null });
+              }}
+            >
+              <option value="">None</option>
+              {departments?.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </DetailRow>
+          <DetailRow label="Due date" htmlFor={fid("due")}>
+            <div className="flex items-center gap-2">
+              <input
+                id={fid("due")}
+                type="date"
+                className={`${fieldClass} !w-auto`}
+                value={task.dueDate ? task.dueDate.slice(0, 10) : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  save("due date", { dueDate: v || null }, { dueDate: v ? `${v}T00:00:00.000Z` : null });
+                }}
+              />
+              <DueDate dueDate={task.dueDate} done={isDone(task)} full />
+            </div>
+          </DetailRow>
+          <DetailRow label="Estimate" htmlFor={fid("estimate")}>
+            <div className="flex items-center gap-2">
+              <InlineText
+                id={fid("estimate")}
+                type="number"
+                value={task.estimatedHours != null ? String(task.estimatedHours) : ""}
+                ariaLabel="Estimated hours"
+                placeholder="—"
+                className="!w-20"
+                onCommit={(v) => {
+                  const estimatedHours = v === "" ? null : Math.max(0, Number(v));
+                  save("estimate", { estimatedHours }, { estimatedHours });
+                }}
+              />
+              <span className="text-xs text-gray-600">
+                hours
+                {task.loggedHours != null && (
+                  <>
+                    {" · "}
+                    <span className={overEstimate ? "text-red-700 font-medium" : undefined}>
+                      {logged}h logged{task.estimatedHours != null && ` of ${task.estimatedHours}h`}
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+          </DetailRow>
+          <DetailRow label="Tags" htmlFor={fid("tags")}>
+            <div className="px-2">
+              <TagInput
+                id={fid("tags")}
+                value={task.tags.map((t) => t.label)}
+                onChange={(tags) => save("tags", { tags }, { tags: tags.map((label) => ({ id: label, label })) as Task["tags"] })}
+              />
+            </div>
+          </DetailRow>
+          <DetailRow label="Reporter">
+            <div className="flex items-center gap-1.5 px-2 py-1 text-sm text-gray-700">
+              <Avatar name={task.createdBy?.name} size="xs" />
+              {task.createdBy?.name ?? "—"}
+              <span className="text-xs text-subtle">· created {format(new Date(task.createdAt), "MMM d, yyyy")}</span>
+            </div>
+          </DetailRow>
+        </dl>
+      </section>
+
+      {/* Subtasks */}
+      <section className="mt-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Subtasks {subtasks.length > 0 && `(${doneSubtasks}/${subtasks.length})`}
+          </h3>
+        </div>
+        {subtasks.length > 0 && (
+          <ul className="space-y-1 mb-2">
+            {subtasks.map((s) => {
+              const done = isDone({ status: s.status });
+              return (
+                <li key={s.id} className="flex items-center gap-2 text-sm border border-gray-100 rounded-md px-3 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    onChange={(e) => toggleSubtask.mutate({ id: s.id, title: s.title, done: e.target.checked })}
+                    aria-label={`Mark "${s.title}" ${done ? "not done" : "done"}`}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <button
+                    onClick={() => onOpenTask?.(s.id)}
+                    className={`flex-1 min-w-0 text-left truncate hover:underline ${done ? "line-through text-subtle" : "text-gray-800"}`}
+                    title="Open subtask"
+                  >
+                    {s.title}
+                  </button>
+                  <span className="text-xs text-gray-600 shrink-0">{statusLabel(s.status)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <form onSubmit={onSubtaskSubmit}>
+          <input
+            value={newSubtask}
+            onChange={(e) => setNewSubtask(e.target.value)}
+            aria-label="New subtask"
+            placeholder="Add a subtask and press Enter"
+            maxLength={200}
+            disabled={addSubtask.isPending}
+            className="w-full border border-dashed border-gray-300 rounded-md px-3 py-1.5 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-60"
+          />
+        </form>
+        {subtasks.length === 0 && <p className="text-xs text-subtle mt-1">It starts with the same assignee, center and department.</p>}
+      </section>
+
+      {/* Time log */}
+      <section className="mt-6 border-t border-gray-100 pt-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Log time</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} aria-label="Date" className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+          <input
+            type="number"
+            min={0.25}
+            max={24}
+            step={0.25}
+            value={logHours}
+            onChange={(e) => setLogHours(e.target.value)}
+            aria-label="Hours"
+            className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-20"
+          />
+          <span className="text-xs text-subtle">hours</span>
+          <button
+            onClick={() => logTime.mutate({ date: logDate, hoursLogged: Number(logHours) })}
+            disabled={logTime.isPending}
+            className={btnSecondary}
+          >
+            Log
+          </button>
+          <button
+            onClick={() => {
+              setLogHours("8");
+              logTime.mutate({ date: logDate, hoursLogged: 8 });
+            }}
+            disabled={logTime.isPending}
+            className={btnSecondary}
+          >
+            Log full day (8h)
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-1.5">Logging the same day again replaces that day's hours.</p>
+      </section>
+
+      {/* Attachments */}
+      <section className="mt-6 border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-700">Attachments</h3>
+          <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
+            <IconUpload className="w-3.5 h-3.5" /> Upload file
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadAttachment.mutate(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+        {uploadAttachment.isPending && <div className="text-xs text-subtle mb-2">Uploading…</div>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {task.attachments?.map((att) => (
+            <AttachmentPreview key={att.id} attachment={att} onClick={() => setViewingAttachment(att)} />
+          ))}
+        </div>
+        {(!task.attachments || task.attachments.length === 0) && (
+          <div className="text-xs text-subtle">No files attached</div>
+        )}
+      </section>
+
+      {/* Comment box sits right above the feed it adds to (status is changed from the picker at the top). */}
+      <section className="mt-6 border-t border-gray-100 pt-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Activity</h3>
+        <form onSubmit={onCommentSubmit} className="mb-4">
+          <textarea
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
+            rows={3}
+            aria-label="Comment"
+            placeholder="What did you do? Add a comment…"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <button type="submit" disabled={!comment.trim() || addComment.isPending} className={btnPrimary}>
+            {addComment.isPending ? "Posting…" : "Comment"}
+          </button>
+        </form>
+        <div className="space-y-3">
+          {activity?.map((item) => (
+            <div key={item.id} className="text-sm border-l-2 border-gray-100 pl-3">
+              {item.kind === "comment" ? (
+                <>
+                  <div className="text-gray-800">
+                    <span className="font-medium">{item.user.name}</span>
+                    {item.statusChangedTo && (
+                      <span className="text-xs text-brand-600 ml-2">→ moved to {statusLabel(item.statusChangedTo)}</span>
+                    )}
+                  </div>
+                  <div className="text-gray-600">{item.comment}</div>
+                </>
+              ) : (
+                <div className="text-gray-600">
+                  <span className="font-medium text-gray-800">{item.user.name}</span> {item.message}
+                </div>
+              )}
+              <div className="text-[11px] text-subtle mt-0.5">
+                {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+              </div>
+            </div>
+          ))}
+          {(!activity || activity.length === 0) && <div className="text-xs text-subtle">No activity yet</div>}
+        </div>
+      </section>
+
       {viewingAttachment && (
         <AttachmentViewerModal attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
       )}
+    </>
+  );
+}
+
+function DetailRow({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[6.5rem_1fr] sm:grid-cols-[7.5rem_1fr] items-center gap-2 px-2 py-0.5">
+      <dt className="text-xs font-medium text-gray-600">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : label}</dt>
+      <dd className="min-w-0">{children}</dd>
     </div>
   );
 }

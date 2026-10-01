@@ -2,8 +2,7 @@ import { Role } from "@/types";
 import DashboardPage from "@/pages/DashboardPage";
 import HierarchyPage from "@/pages/HierarchyPage";
 import UsersPage from "@/pages/UsersPage";
-import CentersPage from "@/pages/CentersPage";
-import DepartmentsPage from "@/pages/DepartmentsPage";
+import OrganizationPage from "@/pages/OrganizationPage";
 import TasksPage from "@/pages/TasksPage";
 import TaskImportPage from "@/pages/TaskImportPage";
 import WeeklyReportPage from "@/pages/WeeklyReportPage";
@@ -12,6 +11,8 @@ import MonthlyReportPage from "@/pages/MonthlyReportPage";
 import MonthlyTeamReportPage from "@/pages/MonthlyTeamReportPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import { ReportsIndexRedirect } from "@/components/ReportsHeader";
+import { Navigate } from "react-router-dom";
 import {
   IconHome,
   IconBoard,
@@ -19,7 +20,6 @@ import {
   IconChart,
   IconUsers,
   IconBuilding,
-  IconLayers,
   IconSettings,
 } from "@/components/icons";
 
@@ -53,15 +53,19 @@ export const APP_ROUTES: AppRoute[] = [
   { path: "tasks/import", label: "Import from Excel", parent: "tasks", roles: ["OWNER", "ADMIN"], element: <TaskImportPage /> },
   { path: "hierarchy", label: "Org Chart", roles: ALL_ROLES, group: "Work", icon: (c) => <IconSitemap className={c} />, element: <HierarchyPage /> },
 
-  { path: "reports/weekly", label: "Weekly Report", roles: ALL_ROLES, end: true, group: "Reports", icon: (c) => <IconChart className={c} />, element: <WeeklyReportPage /> },
-  { path: "reports/weekly/team", label: "Team Weekly", roles: ["OWNER", "ADMIN", "MANAGER"], group: "Reports", icon: (c) => <IconChart className={c} />, element: <WeeklyTeamReportPage /> },
-  { path: "reports/monthly", label: "Monthly Report", roles: ALL_ROLES, end: true, group: "Reports", icon: (c) => <IconChart className={c} />, element: <MonthlyReportPage /> },
-  { path: "reports/monthly/team", label: "Team Monthly", roles: ["OWNER", "ADMIN", "MANAGER"], group: "Reports", icon: (c) => <IconChart className={c} />, element: <MonthlyTeamReportPage /> },
+  // One "Reports" item; the four report pages share a header with Weekly | Monthly and Me | My team.
+  { path: "reports", label: "Reports", roles: ALL_ROLES, group: "Reports", icon: (c) => <IconChart className={c} />, element: <ReportsIndexRedirect /> },
+  { path: "reports/weekly", label: "Reports: Weekly", roles: ALL_ROLES, end: true, element: <WeeklyReportPage /> },
+  { path: "reports/weekly/team", label: "Reports: Team weekly", roles: ["OWNER", "ADMIN", "MANAGER"], element: <WeeklyTeamReportPage /> },
+  { path: "reports/monthly", label: "Reports: Monthly", roles: ALL_ROLES, end: true, element: <MonthlyReportPage /> },
+  { path: "reports/monthly/team", label: "Reports: Team monthly", roles: ["OWNER", "ADMIN", "MANAGER"], element: <MonthlyTeamReportPage /> },
 
   { path: "users", label: "Users", roles: ["OWNER", "ADMIN"], group: "Admin", icon: (c) => <IconUsers className={c} />, element: <UsersPage /> },
-  { path: "centers", label: "Centers", roles: ["OWNER", "ADMIN"], group: "Admin", icon: (c) => <IconBuilding className={c} />, element: <CentersPage /> },
-  { path: "departments", label: "Departments", roles: ["OWNER", "ADMIN"], group: "Admin", icon: (c) => <IconLayers className={c} />, element: <DepartmentsPage /> },
+  { path: "organization", label: "Organization", roles: ["OWNER", "ADMIN"], group: "Admin", icon: (c) => <IconBuilding className={c} />, element: <OrganizationPage /> },
   { path: "settings", label: "Settings", roles: ["OWNER", "ADMIN"], group: "Admin", icon: (c) => <IconSettings className={c} />, element: <SettingsPage /> },
+  // Old addresses keep working.
+  { path: "centers", label: "Organization", roles: ["OWNER", "ADMIN"], element: <Navigate to="/organization" replace /> },
+  { path: "departments", label: "Organization", roles: ["OWNER", "ADMIN"], element: <Navigate to="/organization?tab=departments" replace /> },
 
   { path: "notifications", label: "Notifications", roles: ALL_ROLES, element: <NotificationsPage /> },
 ];

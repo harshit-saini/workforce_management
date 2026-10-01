@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useCenters, useDepartments } from "@/hooks/useLookups";
 import StatCard from "@/components/StatCard";
+import ReportsHeader from "@/components/ReportsHeader";
 import PeriodStepper from "@/components/PeriodStepper";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import { monthLabel, shiftMonth } from "@/lib/periods";
@@ -62,9 +63,10 @@ export default function MonthlyTeamReportPage() {
 
   return (
     <div className="space-y-4">
+      <ReportsHeader kind="monthly" scope="team" />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Team Monthly</h1>
+          <h2 className="text-base font-semibold text-gray-900">Team monthly</h2>
           {data?.updatedAt && (
             <div className="text-xs text-subtle mt-0.5">
               {isCurrentMonth ? "Month still in progress · " : ""}Updated {formatDistanceToNow(new Date(data.updatedAt), { addSuffix: true })}

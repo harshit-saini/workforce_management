@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { notificationHref } from "@/lib/links";
 import { api } from "@/lib/api";
 import { Notification, NotificationType, Paginated } from "@/types";
+import { useInstantEdit } from "@/hooks/useInstantEdit";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import EmptyState from "@/components/EmptyState";
 import { IconBell } from "@/components/icons";
@@ -55,13 +56,14 @@ export default function NotificationsPage() {
     meta: { successMessage: "All notifications marked as read", errorTitle: "Couldn't mark notifications as read" },
   });
 
-  const updatePref = useMutation({
-    mutationFn: (pref: Preference) => api.patch("/notifications/preferences", pref),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notification-preferences"] }),
-    meta: {
-      successMessage: (_: unknown, p: Preference) => `Saved preference for "${typeLabels[p.type]}"`,
-      errorTitle: (p: Preference) => `Couldn't save preference for "${typeLabels[p.type]}"`,
-    },
+  const updatePref = useInstantEdit<Preference>({
+    keys: [["notification-preferences"]],
+    request: (pref) => api.patch("/notifications/preferences", pref),
+    optimistic: (qc, pref) =>
+      qc.setQueryData<Preference[]>(["notification-preferences"], (old) => old?.map((p) => (p.type === pref.type ? pref : p))),
+    inverse: (qc, pref) => qc.getQueryData<Preference[]>(["notification-preferences"])?.find((p) => p.type === pref.type) ?? null,
+    successMessage: (p) => `Saved preference for "${typeLabels[p.type]}"`,
+    errorTitle: (p) => `Couldn't save preference for "${typeLabels[p.type]}"`,
   });
 
   return (

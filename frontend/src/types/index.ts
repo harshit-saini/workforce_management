@@ -39,6 +39,7 @@ export interface Invite {
   centerId: string | null;
   departmentId: string | null;
   managerId: string | null;
+  managerName?: string | null;
   title: string | null;
   expiresAt: string;
   createdAt: string;
@@ -118,6 +119,8 @@ export interface Task {
   subtasks?: { id: string; title: string; status: TaskStatus; assigneeId: string | null; dueDate: string | null }[];
   dueDate: string | null;
   estimatedHours: number | null;
+  /** Total hours logged by everyone; only on the single-task response. */
+  loggedHours?: number;
   blockedReason: string | null;
   tags: TaskTag[];
   watchers?: { userId: string; user: { id: string; name: string } }[];
@@ -190,6 +193,18 @@ export interface OverviewResult {
     createdAt: string;
   }[];
   completedByDay: { date: string; count: number }[];
+  /** Dashboard extras (only on /overview). */
+  tasksOverdue: number;
+  createdDone: number;
+  hoursPerDay: { date: string; hours: number }[];
+  previous: {
+    label: string;
+    tasksCreated: number;
+    tasksCompleted: number;
+    hoursLogged: number;
+    tasksOpen: number;
+    tasksOverdue: number;
+  };
 }
 
 export interface ReportTaskSummary {
@@ -214,6 +229,8 @@ export interface WeeklyReport {
   summary: string | null;
   status: ReportStatus;
   managerComment: string | null;
+  reviewer?: { id: string; name: string } | null;
+  createdAt: string;
   submittedAt: string | null;
   reviewedAt: string | null;
   updatedAt: string;
