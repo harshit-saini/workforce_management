@@ -14,6 +14,15 @@ export const submitWeeklySchema = z.object({
   summary: z.string().optional(),
 });
 
+export const saveSummarySchema = z.object({
+  summary: z.string().max(10000),
+});
+
+export const remindWeeklySchema = z.object({
+  userIds: z.array(z.string()).min(1).max(500),
+  week: z.string().optional(),
+});
+
 export const reviewWeeklySchema = z.object({
   status: z.enum(["APPROVED", "CHANGES_REQUESTED"]),
   managerComment: z.string().optional(),

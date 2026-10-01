@@ -217,6 +217,8 @@ export interface WeeklyReport {
   summary: string | null;
   status: ReportStatus;
   managerComment: string | null;
+  reviewer?: { id: string; name: string } | null;
+  createdAt: string;
   submittedAt: string | null;
   reviewedAt: string | null;
   updatedAt: string;
