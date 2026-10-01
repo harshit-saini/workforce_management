@@ -58,6 +58,7 @@ enum NotificationType {
   TASK_ASSIGNED
   COMMENT_MENTION
   MANUAL_NUDGE
+  USER_JOINED
 }
 
 enum NotificationChannel {

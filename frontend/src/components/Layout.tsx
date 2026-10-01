@@ -86,7 +86,7 @@ export default function Layout() {
           </span>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-gray-400 hover:text-gray-700 shrink-0"
+            className="md:hidden text-subtle hover:text-gray-700 shrink-0"
             aria-label="Close menu"
           >
             <IconX className="w-5 h-5" />
@@ -100,7 +100,7 @@ export default function Layout() {
             return (
               <div key={group.title} className="mb-4">
                 {!collapsed && (
-                  <div className="px-4 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide md:block hidden">
+                  <div className="px-4 mb-1 text-[11px] font-semibold text-subtle uppercase tracking-wide md:block hidden">
                     {group.title}
                   </div>
                 )}
@@ -132,7 +132,7 @@ export default function Layout() {
 
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="hidden md:flex items-center gap-2 px-4 py-3 border-t border-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-50 text-xs shrink-0"
+          className="hidden md:flex items-center gap-2 px-4 py-3 border-t border-gray-100 text-subtle hover:text-gray-700 hover:bg-gray-50 text-xs shrink-0"
         >
           {collapsed ? <IconChevronsRight className="w-4 h-4 mx-auto" /> : (
             <>
@@ -154,7 +154,7 @@ export default function Layout() {
             </button>
             {/* Only where there's real hierarchy: the page's own heading already says where you are. */}
             {current && parentRoute && (
-              <nav aria-label="Breadcrumb" className="text-sm text-gray-400 truncate">
+              <nav aria-label="Breadcrumb" className="text-sm text-subtle truncate">
                 <Link to={`/${parentRoute.path}`} className="hover:text-gray-700 hover:underline">
                   {parentRoute.label}
                 </Link>
@@ -182,7 +182,7 @@ export default function Layout() {
                   <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-popover z-20 py-1">
                     <div className="px-3 py-2 border-b border-gray-100">
                       <div className="text-sm font-medium text-gray-800 truncate">{user.name}</div>
-                      <div className="text-xs text-gray-400 truncate">{user.email}</div>
+                      <div className="text-xs text-subtle truncate">{user.email}</div>
                       <span className="inline-block mt-1 text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                         {user.role}
                       </span>

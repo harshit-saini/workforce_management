@@ -24,7 +24,7 @@ export default function StatCard({
         {to && <IconChevronsRight className="w-4 h-4 text-gray-300 group-hover:text-brand-600 transition-colors" />}
       </div>
       <div className="text-2xl font-semibold text-gray-900 mt-1.5">{value}</div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+      {sub && <div className="text-xs text-subtle mt-1">{sub}</div>}
     </>
   );
   const className = clsx(card, "p-4 border-l-[3px] block");

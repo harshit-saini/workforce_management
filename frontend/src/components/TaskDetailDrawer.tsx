@@ -9,12 +9,15 @@ import AttachmentViewerModal from "@/components/AttachmentViewerModal";
 import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
 import { IconChevronDown, IconLink, IconPlus, IconUpload, IconX } from "@/components/icons";
-import { btnPrimary, btnSecondary, withAlpha } from "@/lib/ui";
+import { btnPrimary, btnSecondary } from "@/lib/ui";
+import { badgeColors } from "@/lib/color";
+import DueDate from "@/components/DueDate";
+import TagInput from "@/components/TagInput";
 import { toast } from "@/lib/toast";
 import { taskHref } from "@/lib/links";
 import { getErrorMessage } from "@/lib/errors";
 import QueryError from "@/components/QueryError";
-import { useCenters, useDepartments, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
+import { useCenters, useDepartments, useIsDone, useTaskStatuses, useUsersList } from "@/hooks/useLookups";
 
 type ActivityItem = ({ kind: "comment" } & TaskComment) | ({ kind: "activity" } & TaskActivity);
 
@@ -27,6 +30,7 @@ interface EditForm {
   departmentId: string;
   dueDate: string;
   estimatedHours: string;
+  tags: string[];
 }
 
 function toEditForm(task: Task): EditForm {
@@ -39,6 +43,7 @@ function toEditForm(task: Task): EditForm {
     departmentId: task.departmentId ?? "",
     dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
     estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : "",
+    tags: task.tags.map((t) => t.label),
   };
 }
 
@@ -71,6 +76,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
   const { data: centers } = useCenters();
   const { data: departments } = useDepartments();
   const { data: statuses } = useTaskStatuses();
+  const isDone = useIsDone();
 
   function statusLabel(key: string): string {
     return statuses?.find((s) => s.key === key)?.label ?? key;
@@ -165,6 +171,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
         departmentId: form.departmentId || null,
         dueDate: form.dueDate || null,
         estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : null,
+        tags: form.tags,
       }),
     onSuccess: () => {
       setIsEditing(false);
@@ -196,7 +203,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
       <div className="fixed inset-0 z-40 flex justify-end">
         <div className="absolute inset-0 bg-black/30" onClick={onClose} />
         <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700" aria-label="Close">
+          <button onClick={onClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
             <IconX className="w-5 h-5" />
           </button>
           {taskQuery.isError ? (
@@ -208,7 +215,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               retrying={taskQuery.isFetching}
             />
           ) : (
-            <div className="text-sm text-gray-400 mt-1">Loading task…</div>
+            <div className="text-sm text-subtle mt-1">Loading task…</div>
           )}
         </div>
       </div>
@@ -219,7 +226,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-white h-full overflow-y-auto shadow-xl p-4 sm:p-6">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700" aria-label="Close">
+        <button onClick={onClose} className="absolute top-4 right-4 text-subtle hover:text-gray-700" aria-label="Close">
           <IconX className="w-5 h-5" />
         </button>
 
@@ -253,9 +260,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 {task.assignee?.name ?? "Unassigned"}
               </span>
               {task.center && <span className="px-2 py-0.5 rounded bg-gray-100">{task.center.name}</span>}
-              {task.dueDate && (
-                <span className="px-2 py-0.5 rounded bg-gray-100">Due {task.dueDate.slice(0, 10)}</span>
-              )}
+              <DueDate dueDate={task.dueDate} done={isDone(task)} full />
             </div>
             {pendingBlockedStatus && (
               <form
@@ -295,6 +300,15 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                   <span className="font-medium">Blocked:</span> {task.blockedReason}
                 </div>
               )}
+            {task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {task.tags.map((t) => (
+                  <span key={t.id} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                    {t.label}
+                  </span>
+                ))}
+              </div>
+            )}
             {task.description && <p className="text-sm text-gray-600 mt-3">{task.description}</p>}
           </>
         ) : (
@@ -393,6 +407,12 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                 />
               </label>
             </div>
+            <div className="mb-3">
+              <span className="text-xs text-gray-500">Tags</span>
+              <div className="mt-0.5">
+                <TagInput value={editForm!.tags} onChange={(tags) => setEditForm({ ...editForm!, tags })} />
+              </div>
+            </div>
             {saveEdit.isError && (
               <p className="text-xs text-red-600 mb-2">Couldn't save changes: {getErrorMessage(saveEdit.error)}</p>
             )}
@@ -420,11 +440,11 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
           <div className="space-y-1">
             {task.subtasks?.map((s) => (
               <div key={s.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-md px-3 py-1.5">
-                <span className={s.status === "DONE" ? "line-through text-gray-400" : "text-gray-700"}>{s.title}</span>
-                <span className="text-xs text-gray-400">{s.status}</span>
+                <span className={s.status === "DONE" ? "line-through text-subtle" : "text-gray-700"}>{s.title}</span>
+                <span className="text-xs text-subtle">{s.status}</span>
               </div>
             ))}
-            {(!task.subtasks || task.subtasks.length === 0) && <div className="text-xs text-gray-400">No subtasks</div>}
+            {(!task.subtasks || task.subtasks.length === 0) && <div className="text-xs text-subtle">No subtasks</div>}
           </div>
         </section>
 
@@ -459,7 +479,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               onChange={(e) => setLogHours(e.target.value)}
               className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-20"
             />
-            <span className="text-xs text-gray-400">hours</span>
+            <span className="text-xs text-subtle">hours</span>
             <button
               onClick={() => logTime.mutate({ date: logDate, hoursLogged: Number(logHours) })}
               disabled={logTime.isPending}
@@ -499,14 +519,14 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
               }}
             />
           </div>
-          {uploadAttachment.isPending && <div className="text-xs text-gray-400 mb-2">Uploading…</div>}
+          {uploadAttachment.isPending && <div className="text-xs text-subtle mb-2">Uploading…</div>}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {task.attachments?.map((att) => (
               <AttachmentPreview key={att.id} attachment={att} onClick={() => setViewingAttachment(att)} />
             ))}
           </div>
           {(!task.attachments || task.attachments.length === 0) && (
-            <div className="text-xs text-gray-400">No files attached</div>
+            <div className="text-xs text-subtle">No files attached</div>
           )}
         </section>
 
@@ -531,12 +551,12 @@ export default function TaskDetailDrawer({ taskId, onClose }: { taskId: string; 
                     <span className="font-medium text-gray-800">{item.user.name}</span> {item.message}
                   </div>
                 )}
-                <div className="text-[11px] text-gray-400 mt-0.5">
+                <div className="text-[11px] text-subtle mt-0.5">
                   {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                 </div>
               </div>
             ))}
-            {(!activity || activity.length === 0) && <div className="text-xs text-gray-400">No activity yet</div>}
+            {(!activity || activity.length === 0) && <div className="text-xs text-subtle">No activity yet</div>}
           </div>
         </section>
       </div>
@@ -564,7 +584,7 @@ function StatusPicker({
   onChange: (key: TaskStatus) => void;
 }) {
   const current = options.find((o) => o.key === value);
-  const color = current?.color ?? "#6b7280";
+  const { background, text } = badgeColors(current?.color ?? "#6b7280");
   return (
     <span className="relative inline-flex items-center">
       <select
@@ -573,7 +593,7 @@ function StatusPicker({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className="appearance-none cursor-pointer rounded pl-2 pr-6 py-0.5 text-xs font-medium border-0 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60 disabled:cursor-wait"
-        style={{ backgroundColor: withAlpha(color, "26"), color }}
+        style={{ backgroundColor: background, color: text }}
       >
         {options.map((o) => (
           <option key={o.key} value={o.key} className="text-gray-900 bg-white">
@@ -581,7 +601,7 @@ function StatusPicker({
           </option>
         ))}
       </select>
-      <IconChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none" style={{ color }} />
+      <IconChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none" style={{ color: text }} />
     </span>
   );
 }

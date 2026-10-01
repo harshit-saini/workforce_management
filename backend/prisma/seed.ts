@@ -150,6 +150,8 @@ async function main() {
   // ── Tasks ─────────────────────────────────────────────────────────────
   const statuses: string[] = ["BACKLOG", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED"];
   const priorities: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+  // Descriptive labels (not the word "priority", which the priority badge already says).
+  const SEED_TAGS = ["customer", "backend", "ops", "design", "finance"];
 
   const taskTitles = [
     "Fix login redirect bug", "Design new onboarding flow", "Migrate database indices",
@@ -197,7 +199,7 @@ async function main() {
         dueDate,
         estimatedHours: 4 + (i % 5) * 2,
         blockedReason: status === "BLOCKED" ? "Waiting on external dependency" : null,
-        tags: { create: i % 3 === 0 ? [{ label: "priority" }] : [] },
+        tags: { create: i % 3 === 0 ? [{ label: SEED_TAGS[(i / 3) % SEED_TAGS.length] }] : [] },
       },
     });
     taskCount++;

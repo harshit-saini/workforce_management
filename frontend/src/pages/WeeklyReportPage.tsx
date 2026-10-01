@@ -79,7 +79,7 @@ export default function WeeklyReportPage() {
           <h1 className="text-lg font-semibold text-gray-900">
             {subjectName ? `${subjectName}'s weekly report` : "Weekly Report"}
           </h1>
-          <div className="text-xs text-gray-400 mt-0.5">Updated {formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true })}</div>
+          <div className="text-xs text-subtle mt-0.5">Updated {formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true })}</div>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">{report.status}</span>
@@ -117,7 +117,6 @@ export default function WeeklyReportPage() {
         tasks={report.overdueTasks}
         emptyLabel="Nothing overdue"
         dateField="dueDate"
-        overdue
       />
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">

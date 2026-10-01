@@ -30,7 +30,7 @@ export default function AttachmentPreview({ attachment, onClick }: { attachment:
       <span className="text-xl leading-none shrink-0">{FILE_KIND_ICON[kind]}</span>
       <div className="min-w-0">
         <div className="text-xs text-gray-700 truncate">{attachment.fileName}</div>
-        <div className="text-[11px] text-gray-400">
+        <div className="text-[11px] text-subtle">
           {kind === "pdf" ? "View" : "Download"} · {formatFileSize(attachment.fileSizeBytes)}
         </div>
       </div>

@@ -298,3 +298,29 @@ export function IconChevronRight(props: IconProps) {
     </svg>
   );
 }
+
+export function IconCheck(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m5.5 12.5 4.2 4.2L18.5 7.8" />
+    </svg>
+  );
+}
+
+export function IconClock(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  );
+}
+
+/** Two level bars — "medium" priority. */
+export function IconEqual(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5.5 9.5h13M5.5 14.5h13" />
+    </svg>
+  );
+}

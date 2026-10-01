@@ -37,7 +37,8 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
       }
     }
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
+    // Capture phase: a parent (like a draggable card) may stop key events from bubbling up to the document.
+    document.addEventListener("keydown", onKey, true);
     function reposition() {
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) return close();
@@ -47,7 +48,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
     window.addEventListener("scroll", reposition, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };
@@ -90,7 +91,7 @@ export default function ActionMenu({ items, label }: { items: ActionMenuItem[]; 
                   item.onSelect();
                 }}
                 className={clsx(
-                  "w-full text-left px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed",
+                  "block w-full text-left px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed",
                   item.danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"
                 )}
               >

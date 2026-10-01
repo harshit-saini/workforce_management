@@ -84,7 +84,7 @@ function ToastItem({ toast: t }: { toast: Toast }) {
       )}
       <button
         onClick={() => toast.dismiss(t.id)}
-        className="text-gray-400 hover:text-gray-700 rounded p-1 -my-0.5 shrink-0"
+        className="text-subtle hover:text-gray-700 rounded p-1 -my-0.5 shrink-0"
         aria-label="Dismiss notification"
       >
         <IconX className="w-4 h-4" />

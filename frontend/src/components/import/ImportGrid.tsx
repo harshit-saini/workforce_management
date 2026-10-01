@@ -135,7 +135,7 @@ const GridRow = memo(function GridRow({
       <td
         className={clsx(
           "sticky left-0 z-10 w-12 border border-gray-200 bg-gray-50 text-center text-xs font-medium",
-          hasError ? "text-red-600" : hasWarning ? "text-amber-600" : "text-gray-400"
+          hasError ? "text-red-600" : hasWarning ? "text-amber-600" : "text-subtle"
         )}
       >
         {row.rowNumber}
@@ -160,7 +160,7 @@ const GridRow = memo(function GridRow({
         {assigneeName ? (
           <span className="text-gray-700">{assigneeName}</span>
         ) : (
-          <span className="italic text-gray-400">{row.assigneeEmail ? "Not found" : "Unassigned"}</span>
+          <span className="italic text-subtle">{row.assigneeEmail ? "Not found" : "Unassigned"}</span>
         )}
       </td>
       <Cell issue={issues.center}>
@@ -194,7 +194,7 @@ const GridRow = memo(function GridRow({
         <button
           type="button"
           onClick={() => onRemove(row.rowNumber)}
-          className="p-1.5 text-gray-400 hover:text-red-600"
+          className="p-1.5 text-subtle hover:text-red-600"
           title={`Remove row ${row.rowNumber} from this import`}
           aria-label={`Remove row ${row.rowNumber}`}
         >

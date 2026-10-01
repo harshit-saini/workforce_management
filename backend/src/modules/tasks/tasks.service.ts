@@ -49,7 +49,7 @@ export async function buildTaskListWhere(
   accessibleUserIds: string[] | null,
   query: TaskListFilters
 ): Promise<Prisma.TaskWhereInput> {
-  return {
+  const base: Prisma.TaskWhereInput = {
     organizationId,
     AND: [
       scopeWhere(accessibleUserIds),
@@ -58,7 +58,7 @@ export async function buildTaskListWhere(
         : []),
     ],
     ...(query.status ? { status: query.status } : {}),
-    ...(query.priority ? { priority: query.priority } : {}),
+    ...(query.priority ? { priority: { in: query.priority } } : {}),
     ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
     ...(query.centerId ? { centerId: query.centerId } : {}),
     ...(query.departmentId ? { departmentId: query.departmentId } : {}),
@@ -82,6 +82,9 @@ export async function buildTaskListWhere(
     ...(query.view === "ongoing" ? { isRecurring: true } : {}),
     ...(query.view === "board" ? { isRecurring: false } : {}),
   };
+
+  if (!query.collapseSubtasks) return base;
+  return { AND: [base, { OR: [{ parentTaskId: null }, { parentTask: { isNot: base } }] }] };
 }
 
 export async function listTasks(

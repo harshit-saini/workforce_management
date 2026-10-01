@@ -262,11 +262,11 @@ export default function TaskImportPage() {
               dragging ? "border-brand-500 bg-brand-50" : "border-gray-300 hover:border-brand-400 hover:bg-gray-50"
             )}
           >
-            <IconUpload className="w-8 h-8 text-gray-400" />
+            <IconUpload className="w-8 h-8 text-subtle" />
             <span className="text-sm font-medium text-gray-700">
               {uploading ? "Reading and checking your file…" : "Drop your .xlsx file here, or click to choose"}
             </span>
-            <span className="text-xs text-gray-400">Up to 1,000 rows · 2 MB max</span>
+            <span className="text-xs text-subtle">Up to 1,000 rows · 2 MB max</span>
             <input
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -302,7 +302,7 @@ export default function TaskImportPage() {
                 </span>
               )}
               <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">{summary.ready} ready</span>
-              {validating && <span className="text-xs text-gray-400">Checking…</span>}
+              {validating && <span className="text-xs text-subtle">Checking…</span>}
             </div>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -346,7 +346,7 @@ export default function TaskImportPage() {
           {issueList.length > 0 && (
             <div className={`${card} p-4`}>
               <div className="text-sm font-medium text-gray-700 mb-2">
-                Issues <span className="text-gray-400 font-normal">({issueList.length})</span>
+                Issues <span className="text-subtle font-normal">({issueList.length})</span>
               </div>
               <ul className="max-h-60 overflow-y-auto divide-y divide-gray-100">
                 {issueList.map(({ rowNumber, issue }, i) => (
@@ -375,7 +375,7 @@ export default function TaskImportPage() {
         </>
       )}
 
-      {step === "review" && !lookups && <div className="text-sm text-gray-400">Loading your organization's data…</div>}
+      {step === "review" && !lookups && <div className="text-sm text-subtle">Loading your organization's data…</div>}
 
       {step === "done" && (
         <div className={`${card} p-8 text-center space-y-4`}>

@@ -7,6 +7,8 @@ import { useCenters } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import StatCard from "@/components/StatCard";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import EmptyState from "@/components/EmptyState";
+import { IconBuilding } from "@/components/icons";
 
 export default function CentersPage() {
   const centersQuery = useCenters();
@@ -58,6 +60,15 @@ export default function CentersPage() {
           <LoadingText />
         ))}
 
+      {centers?.length === 0 && (
+        <EmptyState
+          icon={<IconBuilding />}
+          title="No centers yet"
+          description="Centers are your offices or sites. Add one to place people and tasks at a location and see numbers for each site."
+          primary={{ label: "Add center", onClick: () => setShowCreate(true) }}
+        />
+      )}
+
       <div className="grid md:grid-cols-2 gap-4">
         {centers?.map((c) => (
           <button
@@ -70,7 +81,7 @@ export default function CentersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-900">{c.name}</div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-subtle">
                   {c.code} · {c.timezone}
                 </div>
               </div>

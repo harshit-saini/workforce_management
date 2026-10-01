@@ -60,16 +60,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
   fastify.get("/auth/invite/:token", async (request) => {
     const { token } = request.params as { token: string };
-    const invite = await prisma.invite.findUnique({ where: { token } });
-    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
-      throw AppError.badRequest("Invite is invalid or has expired");
-    }
-    return {
-      email: invite.email,
-      role: invite.role,
-      organizationId: invite.organizationId,
-      expiresAt: invite.expiresAt,
-    };
+    return authService.getInviteDetails(token);
   });
 
   fastify.post("/auth/invite/:token/accept", async (request, reply) => {

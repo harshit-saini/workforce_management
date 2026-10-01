@@ -15,6 +15,8 @@ export default {
         ],
       },
       colors: {
+        // Secondary text that still meets WCAG AA (gray-500 on white = 4.8:1). Use instead of gray-400.
+        subtle: "#6b7280",
         // Atlassian/Jira-inspired blue scale
         brand: {
           50: "#eef4ff",

@@ -29,6 +29,15 @@ export function useUsersList(params: Record<string, string | undefined> = {}) {
   });
 }
 
+/** Returns a function telling whether a task is finished (its status is in the Done category). */
+export function useIsDone() {
+  const { data: statuses } = useTaskStatuses();
+  return (task: { status: string; completedAt?: string | null }) => {
+    const category = statuses?.find((s) => s.key === task.status)?.category;
+    return category ? category === "DONE" : !!task.completedAt;
+  };
+}
+
 export function useTaskStatuses() {
   return useQuery({
     queryKey: ["task-statuses"],

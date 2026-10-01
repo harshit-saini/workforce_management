@@ -75,7 +75,8 @@ export default function WeeklyTeamReportPage() {
           nextDisabled={weekStart >= currentWeekStart}
           onCurrent={weekStart.getTime() === currentWeekStart.getTime() ? undefined : () => goToWeek(currentWeekStart)}
         />
-        <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        {(centers?.length ?? 0) > 0 && (
+          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All centers</option>
           {centers?.map((c) => (
             <option key={c.id} value={c.id}>
@@ -83,6 +84,7 @@ export default function WeeklyTeamReportPage() {
             </option>
           ))}
         </select>
+        )}
         </div>
       </div>
 
@@ -109,7 +111,7 @@ export default function WeeklyTeamReportPage() {
                 {row.user.name}
               </Link>
               {row.report && (
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-subtle">
                   {row.report.tasksCompleted} completed · {row.report.hoursLogged.toFixed(1)}h logged
                 </div>
               )}
@@ -141,7 +143,7 @@ export default function WeeklyTeamReportPage() {
             </div>
           </div>
         ))}
-        {data?.length === 0 && <div className="px-4 py-6 text-sm text-gray-400 text-center">No team members found</div>}
+        {data?.length === 0 && <div className="px-4 py-6 text-sm text-subtle text-center">No team members found</div>}
       </div>
 
       {requestingChangesFor && (

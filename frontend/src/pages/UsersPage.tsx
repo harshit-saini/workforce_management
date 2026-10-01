@@ -4,7 +4,8 @@ import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
-import { Invite, Role, User } from "@/types";
+import { Invite, InviteDelivery, Role, User } from "@/types";
+import { copyText } from "@/lib/clipboard";
 import { useAuth } from "@/context/AuthContext";
 import { useUsersList, useCenters, useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
@@ -71,10 +72,13 @@ export default function UsersPage() {
   const inviteEmail = (id: string) => invites?.find((i) => i.id === id)?.email ?? "invite";
 
   const resendInvite = useMutation({
-    mutationFn: (id: string) => api.post(`/users/invites/${id}/resend`),
+    mutationFn: (id: string) => api.post<InviteDelivery>(`/users/invites/${id}/resend`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
     meta: {
-      successMessage: (_: unknown, id: string) => `Invite resent to ${inviteEmail(id)}`,
+      successMessage: (res: { data: InviteDelivery }, id: string) =>
+        res.data.emailDelivered
+          ? `Invite resent to ${inviteEmail(id)}`
+          : `New link created for ${inviteEmail(id)}, but no email went out. Use Copy link to send it yourself.`,
       errorTitle: (id: string) => `Couldn't resend the invite to ${inviteEmail(id)}`,
     },
   });
@@ -172,7 +176,7 @@ export default function UsersPage() {
                       <Avatar name={u.name} size="sm" />
                       <div>
                         <div className="font-medium text-gray-800">{u.name}</div>
-                        <div className="text-xs text-gray-400">{u.email}</div>
+                        <div className="text-xs text-subtle">{u.email}</div>
                       </div>
                     </div>
                   </td>
@@ -290,8 +294,13 @@ export default function UsersPage() {
 
       {invites && invites.length > 0 && (
         <div className={card}>
-          <div className="px-4 py-3 border-b border-gray-100 text-sm font-medium text-gray-700">
-            Pending invites
+          <div className="px-4 py-3 border-b border-gray-100">
+            <div className="text-sm font-medium text-gray-700">Pending invites</div>
+            {invites.some((i) => i.emailConfigured === false) && (
+              <p className="text-xs text-amber-800 mt-1">
+                Email isn't set up on this server, so invites aren't emailed. Use Copy link and send it to them yourself.
+              </p>
+            )}
           </div>
           <div className="divide-y divide-gray-100">
             {invites.map((invite) => {
@@ -300,7 +309,7 @@ export default function UsersPage() {
                 <div key={invite.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <div>
                     <div className="text-gray-800">{invite.email}</div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-subtle">
                       {invite.role} · sent {formatDistanceToNow(new Date(invite.createdAt), { addSuffix: true })} ·{" "}
                       {expired ? (
                         <span className="text-red-500">expired</span>
@@ -310,6 +319,7 @@ export default function UsersPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {invite.inviteUrl && <CopyLinkButton url={invite.inviteUrl} />}
                     <button
                       onClick={() => resendInvite.mutate(invite.id)}
                       disabled={resendInvite.isPending}
@@ -415,6 +425,8 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [departmentId, setDepartmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /** Set once the invite exists: the form is replaced by a confirmation with the link. */
+  const [sent, setSent] = useState<(InviteDelivery & { email: string }) | null>(null);
   const queryClient = useQueryClient();
 
   async function onSubmit(e: FormEvent) {
@@ -422,21 +434,48 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     setError(null);
     setSubmitting(true);
     try {
-      await api.post("/users/invite", {
+      const { data } = await api.post<InviteDelivery>("/users/invite", {
         email,
         role,
         centerId: centerId || undefined,
         departmentId: departmentId || undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success(`Invite sent to ${email}`);
       onCreated();
-      onClose();
+      setSent({ ...data, email });
     } catch (err) {
       setError(getErrorMessage(err, "Failed to send invite"));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (sent) {
+    return (
+      <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30 p-4">
+        <div role="dialog" aria-modal="true" className="bg-white rounded-xl shadow-popover p-6 w-full max-w-md">
+          <h2 className="text-base font-semibold text-gray-900">{sent.emailDelivered ? "Invite sent" : "Invite created"}</h2>
+          {sent.emailDelivered ? (
+            <p className="text-sm text-gray-600 mt-2">
+              We emailed {sent.email} a link to join. You can also share it yourself:
+            </p>
+          ) : (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-2">
+              {sent.emailConfigured
+                ? `We couldn't email ${sent.email}. Copy the link below and send it to them yourself.`
+                : `Email isn't set up on this server, so nothing was sent. Copy the link below and send it to ${sent.email} yourself.`}
+            </p>
+          )}
+          <InviteLink url={sent.inviteUrl} />
+          <p className="text-xs text-subtle mt-2">The link works for 7 days. Anyone with it can create the account, so share it only with them.</p>
+          <div className="flex justify-end mt-4">
+            <button onClick={onClose} className={btnPrimary} autoFocus>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -454,26 +493,30 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               <option value="ADMIN">Admin</option>
             </select>
           </FormField>
-          <FormField label="Center">
-            <select className={inputClass} value={centerId} onChange={(e) => setCenterId(e.target.value)}>
-              <option value="">—</option>
-              {centers?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Department">
-            <select className={inputClass} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              <option value="">—</option>
-              {departments?.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
+          {(centers?.length ?? 0) > 0 && (
+            <FormField label="Center">
+              <select className={inputClass} value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                <option value="">—</option>
+                {centers?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
+          {(departments?.length ?? 0) > 0 && (
+            <FormField label="Department">
+              <select className={inputClass} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                <option value="">—</option>
+                {departments?.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <div className="flex justify-end gap-2 mt-2">
             <button type="button" onClick={onClose} className={btnSecondary}>
@@ -485,6 +528,53 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/** Text-style "Copy link" for a pending invite's row. */
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        if (await copyText(url)) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } else {
+          toast.error("Couldn't copy the link", { description: "Open Resend to get a fresh link instead." });
+        }
+      }}
+      className="text-xs text-brand-600 hover:underline"
+    >
+      {copied ? "Copied" : "Copy link"}
+    </button>
+  );
+}
+
+/** The invite link in a read-only box with a Copy button. */
+function InviteLink({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    if (await copyText(url)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      toast.error("Couldn't copy the link", { description: "Select it and copy it by hand." });
+    }
+  }
+  return (
+    <div className="flex items-center gap-2 mt-3">
+      <input
+        readOnly
+        value={url}
+        aria-label="Invite link"
+        onFocus={(e) => e.currentTarget.select()}
+        className="flex-1 min-w-0 border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-gray-50 text-gray-700"
+      />
+      <button type="button" onClick={copy} className={btnSecondary}>
+        {copied ? "Copied" : "Copy link"}
+      </button>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // Deterministic pastel palette keyed by name, so the same person always gets the same color.
 const PALETTE = [
-  { bg: "#deebff", fg: "#0c66e4" },
+  { bg: "#deebff", fg: "#0955c5" },
   { bg: "#e3fcef", fg: "#216e4e" },
   { bg: "#fff0b3", fg: "#7f5f01" },
   { bg: "#ffe2dd", fg: "#ae2e24" },

@@ -40,7 +40,7 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
           <div className="min-w-0">
             <div className="text-sm font-medium text-gray-800 truncate">{attachment.fileName}</div>
-            <div className="text-xs text-gray-400">{formatFileSize(attachment.fileSizeBytes)}</div>
+            <div className="text-xs text-subtle">{formatFileSize(attachment.fileSizeBytes)}</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {kind === "image" && (
@@ -67,7 +67,7 @@ export default function AttachmentViewerModal({ attachment, onClose }: { attachm
             <button onClick={() => downloadFile(url, attachment.fileName)} className={btnSecondary}>
               <IconDownload className="w-4 h-4" /> Download
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 px-1" aria-label="Close">
+            <button onClick={onClose} className="text-subtle hover:text-gray-700 px-1" aria-label="Close">
               <IconX className="w-5 h-5" />
             </button>
           </div>

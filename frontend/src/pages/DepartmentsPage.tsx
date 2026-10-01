@@ -6,6 +6,8 @@ import { toast } from "@/lib/toast";
 import { useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import EmptyState from "@/components/EmptyState";
+import { IconLayers } from "@/components/icons";
 
 export default function DepartmentsPage() {
   const departmentsQuery = useDepartments();
@@ -33,7 +35,7 @@ export default function DepartmentsPage() {
 
       <form onSubmit={onSubmit} className="flex items-end gap-2">
         <FormField label="New department">
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
+          <input id="new-department" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
         </FormField>
         <button type="submit" className="bg-brand-600 text-white text-sm px-3 py-2 rounded-md hover:bg-brand-700 mb-4">
           Add
@@ -57,10 +59,18 @@ export default function DepartmentsPage() {
         {departments?.map((d) => (
           <div key={d.id} className="flex items-center justify-between px-4 py-3 text-sm">
             <div className="font-medium text-gray-800">{d.name}</div>
-            <div className="text-xs text-gray-400">{d._count?.members ?? 0} members</div>
+            <div className="text-xs text-subtle">{d._count?.members ?? 0} members</div>
           </div>
         ))}
-        {departments?.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No departments yet</div>}
+        {departments?.length === 0 && (
+          <EmptyState
+            bare
+            icon={<IconLayers />}
+            title="No departments yet"
+            description="Departments group people by function — Engineering, Sales, Support — so you can filter tasks and reports by team."
+            primary={{ label: "Add a department", onClick: () => document.getElementById("new-department")?.focus() }}
+          />
+        )}
       </div>
     </div>
   );

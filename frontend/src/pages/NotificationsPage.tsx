@@ -5,6 +5,8 @@ import { notificationHref } from "@/lib/links";
 import { api } from "@/lib/api";
 import { Notification, NotificationType, Paginated } from "@/types";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import EmptyState from "@/components/EmptyState";
+import { IconBell } from "@/components/icons";
 
 const typeLabels: Record<NotificationType, string> = {
   TASK_DUE_SOON: "Task due soon",
@@ -15,6 +17,7 @@ const typeLabels: Record<NotificationType, string> = {
   TASK_ASSIGNED: "Task assigned",
   COMMENT_MENTION: "Comment / mention",
   MANUAL_NUDGE: "Manual nudge",
+  USER_JOINED: "New teammate joined",
 };
 
 interface Preference {
@@ -94,15 +97,29 @@ export default function NotificationsPage() {
                 const href = notificationHref(n);
                 if (href) navigate(href);
               }}
-              className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${n.isRead ? "text-gray-400" : "text-gray-800 font-medium"}`}
+              className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex gap-2.5 ${n.isRead ? "text-gray-600" : "text-gray-900 font-medium"}`}
             >
-              <div>{n.message}</div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {typeLabels[n.type]} · {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-              </div>
+              <span
+              className={n.isRead ? "w-2 h-2 shrink-0 mt-1.5" : "w-2 h-2 shrink-0 mt-1.5 rounded-full bg-brand-600"}
+              role={n.isRead ? undefined : "img"}
+              aria-label={n.isRead ? undefined : "Unread"}
+              />
+                  <span className="min-w-0 flex-1">
+                <div>{n.message}</div>
+                <div className="text-xs text-subtle font-normal mt-0.5">
+                  {typeLabels[n.type]} · {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                </div>
+              </span>
             </button>
           ))}
-          {data?.items.length === 0 && <div className="px-4 py-6 text-sm text-gray-400 text-center">No notifications</div>}
+          {data?.items.length === 0 && (
+            <EmptyState
+              bare
+              icon={<IconBell />}
+              title="You're all caught up"
+              description="Assignments, comments and reminders will show up here."
+            />
+          )}
         </div>
       </div>
 

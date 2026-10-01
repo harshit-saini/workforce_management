@@ -47,7 +47,7 @@ export function buildApp() {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
-      return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+      return reply.code(error.statusCode).send({ error: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) });
     }
     if (error instanceof ZodError) {
       return reply.code(400).send({ error: "VALIDATION_ERROR", message: error.issues.map((i) => i.message).join("; "), issues: error.issues });

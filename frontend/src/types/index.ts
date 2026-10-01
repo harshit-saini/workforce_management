@@ -21,7 +21,18 @@ export interface Organization {
   slug: string;
 }
 
+/** Returned when an invite is created or resent. */
+export interface InviteDelivery {
+  inviteUrl: string;
+  /** True only when the email provider accepted the message. */
+  emailDelivered: boolean;
+  emailConfigured: boolean;
+}
+
 export interface Invite {
+  /** The link to share by hand; always present on listed invites. */
+  inviteUrl?: string;
+  emailConfigured?: boolean;
   id: string;
   email: string;
   role: Role;
@@ -42,7 +53,8 @@ export type NotificationType =
   | "MONTHLY_REPORT_PENDING"
   | "TASK_ASSIGNED"
   | "COMMENT_MENTION"
-  | "MANUAL_NUDGE";
+  | "MANUAL_NUDGE"
+  | "USER_JOINED";
 
 export interface User {
   id: string;

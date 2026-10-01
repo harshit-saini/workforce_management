@@ -72,10 +72,17 @@ export async function getUser(organizationId: string, userId: string) {
   return user;
 }
 
-async function sendInviteEmail(organizationId: string, invite: { email: string; role: Role; token: string; expiresAt: Date }) {
+export const inviteLink = (token: string) => `${config.frontendUrl}/invite/${token}`;
+
+/** What the admin needs after sending: the link to share by hand, and whether the email actually went out. */
+function withDelivery<T extends { token: string }>(invite: T, emailDelivered: boolean) {
+  return { ...invite, inviteUrl: inviteLink(invite.token), emailDelivered, emailConfigured: config.email.enabled };
+}
+
+async function sendInviteEmail(organizationId: string, invite: { email: string; role: Role; token: string; expiresAt: Date }): Promise<boolean> {
   const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
-  const inviteUrl = `${config.frontendUrl}/invite/${invite.token}`;
-  await sendEmail({
+  const inviteUrl = inviteLink(invite.token);
+  return sendEmail({
     to: invite.email,
     subject: `You're invited to join ${organization?.name ?? "your team"} on Workforce Management`,
     html: `
@@ -115,16 +122,19 @@ export async function inviteUser(
     },
   });
 
-  await sendInviteEmail(organizationId, invite);
+  const emailDelivered = await sendInviteEmail(organizationId, invite);
 
-  return invite;
+  return withDelivery(invite, emailDelivered);
 }
 
 export async function listInvites(organizationId: string) {
-  return prisma.invite.findMany({
+  const invites = await prisma.invite.findMany({
     where: { organizationId, acceptedAt: null },
     orderBy: { createdAt: "desc" },
   });
+  // Delivery isn't stored, so the list can't say whether each email arrived — but every invite
+  // carries its link, so an admin can always share it by hand.
+  return invites.map((invite) => ({ ...invite, inviteUrl: inviteLink(invite.token), emailConfigured: config.email.enabled }));
 }
 
 /**
@@ -145,9 +155,9 @@ export async function resendInvite(organizationId: string, inviteId: string) {
     },
   });
 
-  await sendInviteEmail(organizationId, updated);
+  const emailDelivered = await sendInviteEmail(organizationId, updated);
 
-  return updated;
+  return withDelivery(updated, emailDelivered);
 }
 
 export async function cancelInvite(organizationId: string, inviteId: string) {

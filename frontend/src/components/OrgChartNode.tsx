@@ -24,7 +24,7 @@ export default function OrgChartNode({ node, highlightId, matchesFilter }: Props
         )}
       >
         {node.reports.length > 0 && (
-          <button onClick={() => setExpanded((e) => !e)} className="text-gray-400 text-xs w-4">
+          <button onClick={() => setExpanded((e) => !e)} className="text-subtle text-xs w-4">
             {expanded ? "▾" : "▸"}
           </button>
         )}
@@ -34,7 +34,7 @@ export default function OrgChartNode({ node, highlightId, matchesFilter }: Props
         </div>
         <div>
           <div className="text-sm font-medium text-gray-800">{node.name}</div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-subtle">
             {node.title ?? node.role} {node.status !== "ACTIVE" && `· ${node.status}`}
           </div>
         </div>

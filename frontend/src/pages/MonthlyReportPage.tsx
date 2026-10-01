@@ -56,7 +56,7 @@ export default function MonthlyReportPage() {
         <div>
           <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Monthly Report"}</h1>
           {report && (
-            <div className="text-xs text-gray-400 mt-0.5">
+            <div className="text-xs text-subtle mt-0.5">
               {isCurrentMonth || new Date(report.generatedAt) < new Date(year, month, 1) ? "Month still in progress · " : ""}
               Updated {formatDistanceToNow(new Date(report.generatedAt), { addSuffix: true })}
             </div>
@@ -104,7 +104,6 @@ export default function MonthlyReportPage() {
             tasks={report.overdueTasks}
             emptyLabel="Nothing overdue"
             dateField="dueDate"
-            overdue
           />
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">

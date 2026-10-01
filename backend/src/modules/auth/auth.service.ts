@@ -7,6 +7,7 @@ import { sendEmail } from "../../lib/email.js";
 import { z } from "zod";
 import { signupSchema, loginSchema, acceptInviteSchema } from "./auth.schemas.js";
 import { seedDefaultTaskStatuses } from "../../lib/defaultStatuses.js";
+import { notifyUser } from "../../lib/notify.js";
 
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -44,9 +45,15 @@ export async function signup(input: z.infer<typeof signupSchema>) {
       data: { name: input.organizationName, slug },
     });
     await seedDefaultTaskStatuses(tx, organization.id);
+    // A first center so the owner's own row, invites and new tasks have somewhere to point
+    // from day one (renamable in Centers). Uses the browser's timezone when it sent one.
+    const hq = await tx.center.create({
+      data: { organizationId: organization.id, name: `${input.organizationName} HQ`, code: "HQ", timezone: input.timezone ?? "UTC" },
+    });
     const user = await tx.user.create({
       data: {
         organizationId: organization.id,
+        centerId: hq.id,
         email: input.email,
         name: input.name,
         passwordHash,
@@ -105,11 +112,41 @@ export async function revokeRefreshToken(rawToken: string) {
   });
 }
 
+/**
+ * Finds an invite that can still be used, or throws an error that says why not, so the invite
+ * page can offer the right next step (ask for a new link vs. just sign in).
+ */
+async function loadUsableInvite(token: string) {
+  const invite = await prisma.invite.findUnique({ where: { token }, include: { organization: { select: { name: true } } } });
+  if (!invite) throw new AppError("This invite link isn't valid.", 404, "INVITE_INVALID");
+  const details = { organizationName: invite.organization.name, email: invite.email };
+  if (invite.acceptedAt) throw new AppError("This invite has already been used.", 410, "INVITE_ACCEPTED", details);
+  if (invite.expiresAt < new Date()) throw new AppError("This invite has expired.", 410, "INVITE_EXPIRED", details);
+  return invite;
+}
+
+/** What the invite page shows before the invitee sets a password: where they're joining, as what, under whom. */
+export async function getInviteDetails(token: string) {
+  const invite = await loadUsableInvite(token);
+  const [center, department, manager] = await Promise.all([
+    invite.centerId ? prisma.center.findUnique({ where: { id: invite.centerId }, select: { name: true } }) : null,
+    invite.departmentId ? prisma.department.findUnique({ where: { id: invite.departmentId }, select: { name: true } }) : null,
+    invite.managerId ? prisma.user.findUnique({ where: { id: invite.managerId }, select: { name: true } }) : null,
+  ]);
+  return {
+    email: invite.email,
+    role: invite.role,
+    title: invite.title,
+    organizationName: invite.organization.name,
+    centerName: center?.name ?? null,
+    departmentName: department?.name ?? null,
+    managerName: manager?.name ?? null,
+    expiresAt: invite.expiresAt,
+  };
+}
+
 export async function acceptInvite(token: string, input: z.infer<typeof acceptInviteSchema>) {
-  const invite = await prisma.invite.findUnique({ where: { token } });
-  if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
-    throw AppError.badRequest("Invite is invalid or has expired");
-  }
+  const invite = await loadUsableInvite(token);
 
   const existing = await prisma.user.findUnique({ where: { email: invite.email } });
   if (existing) throw AppError.conflict("An account with this email already exists");
@@ -134,6 +171,25 @@ export async function acceptInvite(token: string, input: z.infer<typeof acceptIn
     await tx.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } });
     return created;
   });
+
+  // Let the people who manage the workspace know. Best effort: a failed notification must not
+  // undo or fail the join itself.
+  const admins = await prisma.user.findMany({
+    where: { organizationId: invite.organizationId, role: { in: ["OWNER", "ADMIN"] }, status: "ACTIVE", deletedAt: null, id: { not: user.id } },
+    select: { id: true },
+  });
+  await Promise.allSettled(
+    admins.map((admin) =>
+      notifyUser({
+        organizationId: invite.organizationId,
+        userId: admin.id,
+        type: "USER_JOINED",
+        message: `${user.name} joined as ${user.role.toLowerCase()}`,
+        dedupeKey: `user-joined:${user.id}:${admin.id}`,
+        cooldownMs: 24 * 60 * 60 * 1000,
+      })
+    )
+  );
 
   return user;
 }

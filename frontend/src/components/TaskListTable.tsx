@@ -1,13 +1,13 @@
-import { format, isPast, isToday } from "date-fns";
-import clsx from "clsx";
 import { Task } from "@/types";
-import { useTaskStatuses } from "@/hooks/useLookups";
+import { useIsDone, useTaskStatuses } from "@/hooks/useLookups";
+import DueDate from "@/components/DueDate";
 import StatusBadge from "@/components/StatusBadge";
 import PriorityBadge from "@/components/PriorityBadge";
 import Avatar from "@/components/Avatar";
 
 export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
   const { data: statuses } = useTaskStatuses();
+  const isDone = useIsDone();
 
   return (
     <div className="bg-white rounded-xl border border-gray-200/80 shadow-card overflow-x-auto">
@@ -25,11 +25,22 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
         <tbody>
           {tasks.map((t) => {
             const statusOption = statuses?.find((s) => s.key === t.status);
-            const dueDate = t.dueDate ? new Date(t.dueDate) : null;
-            const overdue = dueDate && isPast(dueDate) && !isToday(dueDate);
             return (
               <tr key={t.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => onOpen(t.id)}>
-                <td className="px-4 py-2.5 font-medium text-gray-800">{t.title}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-800">
+                  {/* A real button so keyboard users can reach and open the row; the row's own click still works for the mouse. */}
+                  <button
+                    type="button"
+                    className="text-left font-medium rounded hover:text-brand-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+                  >
+                    {t.title}
+                  </button>
+                  {t.parentTask && (
+                    <div className="text-[11px] font-normal text-subtle truncate max-w-xs" title={`Subtask of ${t.parentTask.title}`}>
+                      ↳ {t.parentTask.title}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">
                   <StatusBadge label={statusOption?.label ?? t.status} color={statusOption?.color ?? "#6b7280"} />
                 </td>
@@ -43,15 +54,15 @@ export default function TaskListTable({ tasks, onOpen }: { tasks: Task[]; onOpen
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500">{t.center?.name ?? "—"}</td>
-                <td className={clsx("px-4 py-2.5", overdue ? "text-red-600 font-medium" : "text-gray-500")}>
-                  {dueDate ? format(dueDate, "MMM d, yyyy") : "—"}
+                <td className="px-4 py-2.5">
+                  {t.dueDate ? <DueDate dueDate={t.dueDate} done={isDone(t)} /> : <span className="text-subtle">—</span>}
                 </td>
               </tr>
             );
           })}
           {tasks.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+              <td colSpan={6} className="px-4 py-6 text-center text-subtle">
                 No tasks found
               </td>
             </tr>

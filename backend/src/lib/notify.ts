@@ -11,6 +11,7 @@ const NOTIFICATION_SUBJECT: Record<NotificationType, string> = {
   TASK_ASSIGNED: "You were assigned a task",
   COMMENT_MENTION: "New activity on a task you're watching",
   MANUAL_NUDGE: "A reminder from your manager",
+  USER_JOINED: "A new teammate joined",
 };
 
 interface NotifyParams {

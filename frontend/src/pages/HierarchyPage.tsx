@@ -55,7 +55,8 @@ export default function HierarchyPage() {
         <button onClick={() => jumpTo(search)} className="px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-50">
           Jump to
         </button>
-        <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        {(centers?.length ?? 0) > 0 && (
+          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All centers</option>
           {centers?.map((c) => (
             <option key={c.id} value={c.id}>
@@ -63,7 +64,9 @@ export default function HierarchyPage() {
             </option>
           ))}
         </select>
-        <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        )}
+        {(departments?.length ?? 0) > 0 && (
+          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
           <option value="">All departments</option>
           {departments?.map((d) => (
             <option key={d.id} value={d.id}>
@@ -71,6 +74,7 @@ export default function HierarchyPage() {
             </option>
           ))}
         </select>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 overflow-x-auto">
@@ -88,7 +92,7 @@ export default function HierarchyPage() {
         {tree?.map((root) => (
           <OrgChartNode key={root.id} node={root} highlightId={highlightId} matchesFilter={matchesFilter} />
         ))}
-        {tree?.length === 0 && <div className="text-sm text-gray-400">No users yet</div>}
+        {tree?.length === 0 && <div className="text-sm text-subtle">No users yet</div>}
       </div>
     </div>
   );

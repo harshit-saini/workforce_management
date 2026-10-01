@@ -66,7 +66,7 @@ export default function MonthlyTeamReportPage() {
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Team Monthly</h1>
           {data?.updatedAt && (
-            <div className="text-xs text-gray-400 mt-0.5">
+            <div className="text-xs text-subtle mt-0.5">
               {isCurrentMonth ? "Month still in progress · " : ""}Updated {formatDistanceToNow(new Date(data.updatedAt), { addSuffix: true })}
             </div>
           )}
@@ -80,7 +80,8 @@ export default function MonthlyTeamReportPage() {
             nextDisabled={year > currentYear || (year === currentYear && month >= currentMonth)}
             onCurrent={isCurrentMonth ? undefined : () => goToMonth({ year: currentYear, month: currentMonth })}
           />
-          <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className={selectClass}>
+          {(centers?.length ?? 0) > 0 && (
+            <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className={selectClass}>
             <option value="">All centers</option>
             {centers?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -88,7 +89,9 @@ export default function MonthlyTeamReportPage() {
               </option>
             ))}
           </select>
-          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectClass}>
+          )}
+          {(departments?.length ?? 0) > 0 && (
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectClass}>
             <option value="">All departments</option>
             {departments?.map((d) => (
               <option key={d.id} value={d.id}>
@@ -96,6 +99,7 @@ export default function MonthlyTeamReportPage() {
               </option>
             ))}
           </select>
+          )}
         </div>
       </div>
 
@@ -156,7 +160,7 @@ export default function MonthlyTeamReportPage() {
                 ))}
                 {data.all.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                    <td colSpan={5} className="px-4 py-6 text-center text-subtle">
                       No team members found
                     </td>
                   </tr>
@@ -186,7 +190,7 @@ function RankList({
   return (
     <div className={`${card} p-4`}>
       <div className="text-sm font-medium text-gray-700 mb-2">{title}</div>
-      {entries.length === 0 && <div className="text-xs text-gray-400">{empty}</div>}
+      {entries.length === 0 && <div className="text-xs text-subtle">{empty}</div>}
       {entries.map((p) => (
         <div key={p.user.id} className="flex justify-between text-sm py-1">
           <Link to={link(p.user.id)} className="hover:text-brand-700 hover:underline">
