@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, addDays } from "date-fns";
+import { format, formatDistanceToNow, addDays } from "date-fns";
 import PeriodStepper from "@/components/PeriodStepper";
 import { dayParam, parseDay, weekLabel, weekStartOf } from "@/lib/periods";
 import { Link, useSearchParams } from "react-router-dom";
@@ -129,6 +129,7 @@ function ReportView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s weekly report` : "Weekly Report"}</h1>
+          <div className="text-xs text-subtle mt-0.5">Updated {formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true })}</div>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-medium px-2 py-1 rounded-full ring-1 ring-inset ${statusBadge.cls}`}>{statusBadge.text}</span>
