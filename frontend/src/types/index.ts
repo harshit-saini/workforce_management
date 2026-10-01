@@ -204,6 +204,7 @@ export interface WeeklyReport {
   managerComment: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
+  updatedAt: string;
   completedTasks: ReportTaskSummary[];
   overdueTasks: ReportTaskSummary[];
 }

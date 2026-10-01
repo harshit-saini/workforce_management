@@ -1,30 +1,28 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import Layout from "@/components/Layout";
 import Toaster from "@/components/Toaster";
+import RequireRole from "@/components/RequireRole";
+import { APP_ROUTES } from "@/lib/routes";
+import { authRedirectPending } from "@/lib/api";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
 import AcceptInvitePage from "@/pages/AcceptInvitePage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import DashboardPage from "@/pages/DashboardPage";
-import HierarchyPage from "@/pages/HierarchyPage";
-import UsersPage from "@/pages/UsersPage";
-import CentersPage from "@/pages/CentersPage";
-import DepartmentsPage from "@/pages/DepartmentsPage";
-import TasksPage from "@/pages/TasksPage";
-import TaskImportPage from "@/pages/TaskImportPage";
-import WeeklyReportPage from "@/pages/WeeklyReportPage";
-import WeeklyTeamReportPage from "@/pages/WeeklyTeamReportPage";
-import MonthlyReportPage from "@/pages/MonthlyReportPage";
-import MonthlyTeamReportPage from "@/pages/MonthlyTeamReportPage";
-import NotificationsPage from "@/pages/NotificationsPage";
-import SettingsPage from "@/pages/SettingsPage";
+import NotFoundPage from "@/pages/NotFoundPage";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="flex h-screen items-center justify-center text-gray-400">Loading…</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    // A hard redirect to /login?reason=expired is already in flight; don't race it with a plainer one.
+    if (authRedirectPending) return null;
+    // Carries the page they meant to open, so a bookmarked or shared link still lands there after signing in.
+    const next = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`} replace />;
+  }
   return children;
 }
 
@@ -54,20 +52,19 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
-        <Route path="hierarchy" element={<HierarchyPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="centers" element={<CentersPage />} />
-        <Route path="departments" element={<DepartmentsPage />} />
-        <Route path="tasks" element={<TasksPage />} />
-        <Route path="tasks/import" element={<TaskImportPage />} />
-        <Route path="reports/weekly" element={<WeeklyReportPage />} />
-        <Route path="reports/weekly/team" element={<WeeklyTeamReportPage />} />
-        <Route path="reports/monthly" element={<MonthlyReportPage />} />
-        <Route path="reports/monthly/team" element={<MonthlyTeamReportPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {APP_ROUTES.map((route) => {
+          const element = (
+            <RequireRole roles={route.roles} label={route.label}>
+              {route.element}
+            </RequireRole>
+          );
+          return route.path === "" ? (
+            <Route key="index" index element={element} />
+          ) : (
+            <Route key={route.path} path={route.path} element={element} />
+          );
+        })}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

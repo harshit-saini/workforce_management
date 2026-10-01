@@ -42,6 +42,12 @@ async function listOverdueTasksForUser(organizationId: string, userId: string) {
   });
 }
 
+/** Reports are rebuilt when opened, but not more than once in this window (a team view opens many at once). */
+const REFRESH_TTL_MS = 30_000;
+
+/** Statuses where the employee can still change the report, so its numbers should keep following the tasks. */
+const EDITABLE_REPORT_STATUSES = ["DRAFT", "CHANGES_REQUESTED"];
+
 export async function generateWeeklyReport(organizationId: string, userId: string, anyDateInWeek: Date) {
   const weekStartDate = startOfWeek(anyDateInWeek);
   const weekEndDate = endOfWeek(anyDateInWeek);
@@ -51,7 +57,8 @@ export async function generateWeeklyReport(organizationId: string, userId: strin
   const existing = await prisma.weeklyReport.findUnique({
     where: { userId_weekStartDate: { userId, weekStartDate } },
   });
-  if (existing && existing.status !== "DRAFT") return existing;
+  // Once submitted, the numbers are frozen — that's what the manager reviewed.
+  if (existing && !EDITABLE_REPORT_STATUSES.includes(existing.status)) return existing;
 
   return prisma.weeklyReport.upsert({
     where: { userId_weekStartDate: { userId, weekStartDate } },
@@ -76,6 +83,25 @@ export async function generateWeeklyReport(organizationId: string, userId: strin
   });
 }
 
+/**
+ * Which week to show when none is asked for: the oldest recent past week that still needs
+ * submitting (the one the Monday reminder is nagging about), otherwise the current week.
+ */
+export async function getDefaultWeek(organizationId: string, userId: string, now = new Date()): Promise<Date> {
+  const thisWeek = startOfWeek(now);
+  const oldest = await prisma.weeklyReport.findFirst({
+    where: {
+      organizationId,
+      userId,
+      status: { in: ["DRAFT", "CHANGES_REQUESTED"] },
+      weekStartDate: { lt: thisWeek, gte: addDays(thisWeek, -7 * 8) },
+    },
+    orderBy: { weekStartDate: "asc" },
+    select: { weekStartDate: true },
+  });
+  return oldest?.weekStartDate ?? thisWeek;
+}
+
 export async function getWeeklyReport(organizationId: string, userId: string, anyDateInWeek: Date) {
   const weekStartDate = startOfWeek(anyDateInWeek);
   // Scoped by organizationId in addition to the userId/weekStartDate unique key, as defense in
@@ -83,7 +109,12 @@ export async function getWeeklyReport(organizationId: string, userId: string, an
   const existing = await prisma.weeklyReport.findFirst({
     where: { userId, weekStartDate, organizationId },
   });
-  const report = existing ?? (await generateWeeklyReport(organizationId, userId, anyDateInWeek));
+  // Draft numbers are a snapshot; rebuild them on open so the tiles match the live task lists below.
+  const stale =
+    !!existing &&
+    EDITABLE_REPORT_STATUSES.includes(existing.status) &&
+    Date.now() - existing.updatedAt.getTime() > REFRESH_TTL_MS;
+  const report = existing && !stale ? existing : await generateWeeklyReport(organizationId, userId, anyDateInWeek);
 
   const [completedTasks, overdueTasks] = await Promise.all([
     listCompletedTasksInRange(organizationId, userId, report.weekStartDate, report.weekEndDate),
@@ -271,7 +302,14 @@ export async function generateMonthlyReport(organizationId: string, userId: stri
 async function getMonthlyReportRecord(organizationId: string, userId: string, year: number, month: number) {
   // Scoped by organizationId in addition to the unique key — see getWeeklyReport above.
   const existing = await prisma.monthlyReport.findFirst({ where: { userId, year, month, organizationId } });
-  return existing ?? generateMonthlyReport(organizationId, userId, year, month);
+  if (!existing) return generateMonthlyReport(organizationId, userId, year, month);
+  // A report saved while its month was still running is out of date — rebuild it until it has been
+  // generated after the month ended, at which point it's final.
+  const generatedWhileInProgress = existing.generatedAt.getTime() <= endOfMonth(year, month).getTime();
+  if (generatedWhileInProgress && Date.now() - existing.generatedAt.getTime() > REFRESH_TTL_MS) {
+    return generateMonthlyReport(organizationId, userId, year, month);
+  }
+  return existing;
 }
 
 export async function getMonthlyReport(organizationId: string, userId: string, year: number, month: number) {
@@ -310,12 +348,27 @@ export async function monthlyTeamSummary(
     users.map((u) => getMonthlyReportRecord(organizationId, u.id, year, month).then((r) => ({ user: u, report: r })))
   );
 
-  const avgCompletionRate =
-    reports.length > 0 ? reports.reduce((sum, r) => sum + r.report.completionRate, 0) / reports.length : 0;
+  const updatedAt = reports.length ? new Date(Math.min(...reports.map((r) => r.report.generatedAt.getTime()))) : null;
+  return { ...rankMonthlyTeam(reports), updatedAt };
+}
 
-  const ranked = [...reports].sort((a, b) => b.report.completionRate - a.report.completionRate);
-  const topPerformers = ranked.slice(0, 5);
-  const atRisk = ranked.filter((r) => r.report.completionRate < 0.5).slice(0, 10);
+export const AT_RISK_BELOW = 0.5;
 
-  return { avgCompletionRate, topPerformers, atRisk, all: reports };
+/**
+ * Splits a team into top performers and at-risk people — never both. People with no planned
+ * tasks have nothing to measure, so they sit in neither list and don't drag the average to 0%.
+ */
+export function rankMonthlyTeam<T extends { report: { tasksPlanned: number; completionRate: number } }>(entries: T[]) {
+  const measurable = entries.filter((e) => e.report.tasksPlanned > 0);
+  const byRateDesc = [...measurable].sort((a, b) => b.report.completionRate - a.report.completionRate);
+  const avgCompletionRate = measurable.length
+    ? measurable.reduce((sum, e) => sum + e.report.completionRate, 0) / measurable.length
+    : null;
+  return {
+    avgCompletionRate,
+    topPerformers: byRateDesc.filter((e) => e.report.completionRate >= AT_RISK_BELOW).slice(0, 5),
+    atRisk: byRateDesc.filter((e) => e.report.completionRate < AT_RISK_BELOW).reverse().slice(0, 10),
+    // Everyone, best first, with the unmeasurable at the end.
+    all: [...byRateDesc, ...entries.filter((e) => e.report.tasksPlanned === 0)],
+  };
 }

@@ -9,12 +9,9 @@ import { Notification, Paginated } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { IconBell } from "@/components/icons";
 
-export default function NotificationBell() {
-  const [open, setOpen] = useState(false);
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-
-  const { data, isError } = useQuery({
+/** The bell's feed (also read by the tab title for the unread count). One query, shared by key. */
+export function useBellNotifications() {
+  return useQuery({
     queryKey: ["notifications", "bell"],
     queryFn: async () => {
       const { data } = await api.get<Paginated<Notification> & { unreadCount: number }>("/notifications", {
@@ -26,6 +23,13 @@ export default function NotificationBell() {
     // Polling shouldn't toast every 30s while offline; the dropdown says so instead.
     meta: { silentRefetchErrors: true },
   });
+}
+
+export default function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { data, isError } = useBellNotifications();
 
   async function openNotification(n: Notification) {
     const href = notificationHref(n);

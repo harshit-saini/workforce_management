@@ -1,58 +1,21 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
-import NotificationBell from "@/components/NotificationBell";
+import NotificationBell, { useBellNotifications } from "@/components/NotificationBell";
+import { api } from "@/lib/api";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { Organization } from "@/types";
 import Avatar from "@/components/Avatar";
+import { APP_ROUTES, NAV_GROUPS, matchRoute } from "@/lib/routes";
 import {
-  IconHome,
-  IconBoard,
-  IconSitemap,
-  IconChart,
-  IconUsers,
-  IconBuilding,
-  IconLayers,
-  IconSettings,
   IconChevronsLeft,
   IconChevronsRight,
   IconMenu,
   IconX,
   IconLogOut,
 } from "@/components/icons";
-
-type NavItem = { to: string; label: string; roles: string[]; end?: boolean; icon: (className: string) => JSX.Element };
-type NavGroup = { title: string; items: NavItem[] };
-
-const navGroups: NavGroup[] = [
-  {
-    title: "Work",
-    items: [
-      { to: "/", label: "Dashboard", roles: ["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"], end: true, icon: (c) => <IconHome className={c} /> },
-      { to: "/tasks", label: "Tasks", roles: ["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"], icon: (c) => <IconBoard className={c} /> },
-      { to: "/hierarchy", label: "Org Chart", roles: ["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"], icon: (c) => <IconSitemap className={c} /> },
-    ],
-  },
-  {
-    title: "Reports",
-    items: [
-      { to: "/reports/weekly", label: "Weekly Report", roles: ["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"], icon: (c) => <IconChart className={c} /> },
-      { to: "/reports/weekly/team", label: "Team Weekly", roles: ["OWNER", "ADMIN", "MANAGER"], icon: (c) => <IconChart className={c} /> },
-      { to: "/reports/monthly", label: "Monthly Report", roles: ["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"], icon: (c) => <IconChart className={c} /> },
-      { to: "/reports/monthly/team", label: "Team Monthly", roles: ["OWNER", "ADMIN", "MANAGER"], icon: (c) => <IconChart className={c} /> },
-    ],
-  },
-  {
-    title: "Admin",
-    items: [
-      { to: "/users", label: "Users", roles: ["OWNER", "ADMIN"], icon: (c) => <IconUsers className={c} /> },
-      { to: "/centers", label: "Centers", roles: ["OWNER", "ADMIN"], icon: (c) => <IconBuilding className={c} /> },
-      { to: "/departments", label: "Departments", roles: ["OWNER", "ADMIN"], icon: (c) => <IconLayers className={c} /> },
-      { to: "/settings", label: "Settings", roles: ["OWNER", "ADMIN"], icon: (c) => <IconSettings className={c} /> },
-    ],
-  },
-];
-
-const allItems = navGroups.flatMap((g) => g.items);
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -69,9 +32,21 @@ export default function Layout() {
     setMenuOpen(false);
   }, [location.pathname]);
 
+  // Same key as the Settings page, so renaming the organization there updates this immediately.
+  const { data: org } = useQuery({
+    queryKey: ["organization"],
+    queryFn: async () => (await api.get<Organization>("/settings/organization")).data,
+    staleTime: 5 * 60_000,
+    enabled: !!user,
+  });
+  const { data: bell } = useBellNotifications();
+  const current = matchRoute(location.pathname);
+  const unread = bell?.unreadCount ?? 0;
+  usePageTitle(`${unread > 0 ? `(${unread}) ` : ""}${current ? current.label : "Page not found"}`, org?.name);
+
   if (!user) return null;
 
-  const currentLabel = allItems.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)))?.label;
+  const parentRoute = current?.parent ? APP_ROUTES.find((r) => r.path === current.parent) : undefined;
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -97,7 +72,14 @@ export default function Layout() {
             <span className="w-7 h-7 rounded-md bg-brand-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
               W
             </span>
-            <span className="font-semibold text-gray-800 truncate">Workforce Mgmt</span>
+            <div className="min-w-0 leading-tight">
+              <div className="font-semibold text-gray-800 text-sm truncate">Workforce Mgmt</div>
+              {org && (
+                <div className="text-xs text-gray-500 truncate" title={org.name}>
+                  {org.name}
+                </div>
+              )}
+            </div>
           </div>
           <span className={clsx("hidden", collapsed && "md:flex w-7 h-7 rounded-md bg-brand-600 text-white items-center justify-center font-bold text-sm mx-auto")}>
             W
@@ -112,7 +94,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3">
-          {navGroups.map((group) => {
+          {NAV_GROUPS.map((group) => {
             const visibleItems = group.items.filter((item) => item.roles.includes(user.role));
             if (visibleItems.length === 0) return null;
             return (
@@ -124,8 +106,8 @@ export default function Layout() {
                 )}
                 {visibleItems.map((item) => (
                   <NavLink
-                    key={item.to}
-                    to={item.to}
+                    key={item.path}
+                    to={`/${item.path}`}
                     end={item.end}
                     onClick={() => setSidebarOpen(false)}
                     title={collapsed ? item.label : undefined}
@@ -139,7 +121,7 @@ export default function Layout() {
                       )
                     }
                   >
-                    {item.icon("w-[18px] h-[18px] shrink-0")}
+                    {item.icon!("w-[18px] h-[18px] shrink-0")}
                     <span className={clsx(collapsed && "md:hidden", "truncate")}>{item.label}</span>
                   </NavLink>
                 ))}
@@ -170,10 +152,19 @@ export default function Layout() {
             >
               <IconMenu className="w-5 h-5" />
             </button>
-            {currentLabel && (
-              <div className="text-sm text-gray-400 truncate">
-                Workspace <span className="mx-1">/</span> <span className="text-gray-700 font-medium">{currentLabel}</span>
-              </div>
+            {/* Only where there's real hierarchy: the page's own heading already says where you are. */}
+            {current && parentRoute && (
+              <nav aria-label="Breadcrumb" className="text-sm text-gray-400 truncate">
+                <Link to={`/${parentRoute.path}`} className="hover:text-gray-700 hover:underline">
+                  {parentRoute.label}
+                </Link>
+                <span className="mx-1.5" aria-hidden="true">
+                  ›
+                </span>
+                <span className="text-gray-700 font-medium" aria-current="page">
+                  {current.label}
+                </span>
+              </nav>
             )}
           </div>
           <div className="flex items-center gap-3 shrink-0">

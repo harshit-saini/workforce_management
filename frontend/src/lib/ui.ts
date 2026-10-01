@@ -7,6 +7,9 @@ export const btnSecondary =
 export const btnDanger =
   "inline-flex items-center justify-center gap-1.5 text-red-600 text-sm font-medium hover:bg-red-50 px-3 py-1.5 rounded-md disabled:opacity-50 disabled:pointer-events-none transition-colors";
 
+export const btnDangerSolid =
+  "inline-flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:pointer-events-none transition-colors";
+
 export const btnGhost =
   "inline-flex items-center justify-center gap-1.5 text-gray-500 text-sm font-medium hover:bg-gray-100 hover:text-gray-800 px-3 py-1.5 rounded-md disabled:opacity-50 disabled:pointer-events-none transition-colors";
 

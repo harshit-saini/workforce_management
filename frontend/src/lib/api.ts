@@ -43,6 +43,15 @@ api.interceptors.request.use((req) => {
   return req;
 });
 
+/**
+ * True for the brief window between issuing the hard redirect below and the browser actually
+ * navigating there. Without this, AuthContext's own `user` state also goes null in that window
+ * (the same failed request that triggered the redirect is what `/users/me` was), and
+ * ProtectedRoute would race it with its own client-side `<Navigate>` — which carries no
+ * `reason=expired`/`next` and can win the race, silently dropping both.
+ */
+export let authRedirectPending = false;
+
 let refreshPromise: Promise<string | null> | null = null;
 
 async function performRefresh(): Promise<string | null> {
@@ -70,7 +79,13 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       }
-      window.location.href = "/login";
+      // A full reload (not a router navigate) so every in-memory query/mutation state is
+      // dropped along with the dead tokens. `next` brings them back to what they were doing.
+      if (window.location.pathname !== "/login") {
+        authRedirectPending = true;
+        const next = `${window.location.pathname}${window.location.search}`;
+        window.location.href = `/login?reason=expired&next=${encodeURIComponent(next)}`;
+      }
     }
     return Promise.reject(error);
   }

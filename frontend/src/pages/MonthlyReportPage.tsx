@@ -1,7 +1,8 @@
-import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import PeriodStepper from "@/components/PeriodStepper";
+import { monthLabel, shiftMonth } from "@/lib/periods";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useUsersList } from "@/hooks/useLookups";
@@ -13,15 +14,24 @@ import QueryError, { LoadingText } from "@/components/QueryError";
 
 export default function MonthlyReportPage() {
   const now = new Date();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   // ?userId= (plus optional month/year) lets managers open a team member's report from Team Monthly.
   const requestedUserId = params.get("userId");
   const viewingOther = !!requestedUserId && requestedUserId !== user?.id;
   const { data: users } = useUsersList();
   const subjectName = viewingOther ? users?.items.find((u) => u.id === requestedUserId)?.name ?? "Team member" : null;
-  const [month, setMonth] = useState(Number(params.get("month")) || now.getMonth() + 1);
-  const [year, setYear] = useState(Number(params.get("year")) || now.getFullYear());
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const month = Math.min(12, Math.max(1, Number(params.get("month")) || currentMonth));
+  const year = Number(params.get("year")) || currentYear;
+  const isCurrentMonth = year === currentYear && month === currentMonth;
+  const goToMonth = (target: { year: number; month: number }) => {
+    const next = new URLSearchParams(params);
+    next.set("year", String(target.year));
+    next.set("month", String(target.month));
+    setParams(next);
+  };
 
   const reportQuery = useQuery({
     queryKey: ["monthly-report", viewingOther ? requestedUserId : "self", month, year],
@@ -38,22 +48,28 @@ export default function MonthlyReportPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       {viewingOther && (
-        <Link to="/reports/monthly/team" className="text-xs text-brand-600 hover:underline">
+        <Link to={`/reports/monthly/team?year=${year}&month=${month}`} className="text-xs text-brand-600 hover:underline">
           ← Team monthly rollup
         </Link>
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Monthly Report"}</h1>
-        <div className="flex gap-2">
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {format(new Date(2000, m - 1, 1), "MMMM")}
-              </option>
-            ))}
-          </select>
-          <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-24" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">{subjectName ? `${subjectName}'s monthly report` : "Monthly Report"}</h1>
+          {report && (
+            <div className="text-xs text-gray-400 mt-0.5">
+              {isCurrentMonth || new Date(report.generatedAt) < new Date(year, month, 1) ? "Month still in progress · " : ""}
+              Updated {formatDistanceToNow(new Date(report.generatedAt), { addSuffix: true })}
+            </div>
+          )}
         </div>
+        <PeriodStepper
+          unit="month"
+          label={monthLabel(year, month)}
+          onPrev={() => goToMonth(shiftMonth(year, month, -1))}
+          onNext={() => goToMonth(shiftMonth(year, month, 1))}
+          nextDisabled={year > currentYear || (year === currentYear && month >= currentMonth)}
+          onCurrent={isCurrentMonth ? undefined : () => goToMonth({ year: currentYear, month: currentMonth })}
+        />
       </div>
 
       {!report &&

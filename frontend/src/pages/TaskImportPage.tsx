@@ -224,10 +224,7 @@ export default function TaskImportPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <Link to="/tasks" className="text-xs text-brand-600 hover:underline">
-            ← Back to tasks
-          </Link>
-          <h1 className="text-lg font-semibold text-gray-900 mt-1">Import tasks from Excel</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Import from Excel</h1>
         </div>
         <button onClick={downloadTemplate} className={btnSecondary}>
           <IconDownload className="w-4 h-4" /> Download template

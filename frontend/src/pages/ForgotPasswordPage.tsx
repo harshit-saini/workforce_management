@@ -1,10 +1,12 @@
 import { useState, FormEvent } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import FormField, { inputClass } from "@/components/FormField";
 import { btnPrimary } from "@/lib/ui";
 
 export default function ForgotPasswordPage() {
+  usePageTitle("Forgot password");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, addDays } from "date-fns";
+import PeriodStepper from "@/components/PeriodStepper";
+import { dayParam, parseDay, weekLabel, weekStartOf } from "@/lib/periods";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useUsersList } from "@/hooks/useLookups";
@@ -16,17 +18,19 @@ export default function WeeklyReportPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   // ?userId= lets managers open a team member's report from Team Weekly (read-only).
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const weekParam = params.get("week");
   const requestedUserId = params.get("userId");
   const viewingOther = !!requestedUserId && requestedUserId !== user?.id;
   const { data: users } = useUsersList();
   const subjectName = viewingOther ? users?.items.find((u) => u.id === requestedUserId)?.name ?? "Team member" : null;
 
   const reportQuery = useQuery({
-    queryKey: ["weekly-report", viewingOther ? requestedUserId : "self"],
+    // With no ?week= the server opens your oldest past week that still needs submitting (else this week).
+    queryKey: ["weekly-report", viewingOther ? requestedUserId : "self", weekParam ?? "default"],
     queryFn: async () => {
       const { data } = await api.get<WeeklyReport>("/reports/weekly", {
-        params: { userId: viewingOther ? requestedUserId : undefined },
+        params: { userId: viewingOther ? requestedUserId : undefined, week: weekParam ?? undefined },
       });
       setSummary(data.summary ?? "");
       return data;
@@ -53,6 +57,16 @@ export default function WeeklyReportPage() {
     );
   }
 
+  const weekStart = parseDay(report.weekStartDate);
+  const currentWeekStart = weekStartOf(new Date());
+  const isCurrentWeek = weekStart.getTime() === currentWeekStart.getTime();
+  const editable = report.status === "DRAFT" || report.status === "CHANGES_REQUESTED";
+  const goToWeek = (d: Date) => {
+    const next = new URLSearchParams(params);
+    next.set("week", dayParam(d));
+    setParams(next);
+  };
+
   return (
     <div className="space-y-4 max-w-2xl">
       {viewingOther && (
@@ -60,12 +74,30 @@ export default function WeeklyReportPage() {
           ← Team weekly reports
         </Link>
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">
-          {subjectName ? `${subjectName}'s weekly report` : "Weekly Report"} — {format(new Date(report.weekStartDate), "MMM d")} to {format(new Date(report.weekEndDate), "MMM d")}
-        </h1>
-        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">{report.status}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">
+            {subjectName ? `${subjectName}'s weekly report` : "Weekly Report"}
+          </h1>
+          <div className="text-xs text-gray-400 mt-0.5">Updated {formatDistanceToNow(new Date(report.updatedAt), { addSuffix: true })}</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">{report.status}</span>
+          <PeriodStepper
+            unit="week"
+            label={weekLabel(weekStart)}
+            onPrev={() => goToWeek(addDays(weekStart, -7))}
+            onNext={() => goToWeek(addDays(weekStart, 7))}
+            nextDisabled={weekStart >= currentWeekStart}
+            onCurrent={isCurrentWeek ? undefined : () => goToWeek(currentWeekStart)}
+          />
+        </div>
       </div>
+      {!viewingOther && editable && weekStart < currentWeekStart && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          This report for {weekLabel(weekStart)} hasn't been submitted yet.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Completed" value={report.tasksCompleted} accent="#216e4e" />
@@ -75,9 +107,9 @@ export default function WeeklyReportPage() {
       </div>
 
       <ReportTaskList
-        title="Completed this week"
+        title={isCurrentWeek ? "Completed this week" : "Completed that week"}
         tasks={report.completedTasks}
-        emptyLabel="No tasks completed yet this week"
+        emptyLabel={isCurrentWeek ? "No tasks completed yet this week" : "No tasks completed this week"}
         dateField="completedAt"
       />
       <ReportTaskList

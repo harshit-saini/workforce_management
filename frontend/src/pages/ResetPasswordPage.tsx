@@ -1,10 +1,12 @@
 import { useEffect, useState, FormEvent } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import FormField, { inputClass } from "@/components/FormField";
 import { btnPrimary } from "@/lib/ui";
 
 export default function ResetPasswordPage() {
+  usePageTitle("Reset password");
   const { token } = useParams<{ token: string }>();
   const [checking, setChecking] = useState(true);
   const [validToken, setValidToken] = useState(false);
