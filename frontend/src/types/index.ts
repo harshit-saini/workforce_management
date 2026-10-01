@@ -193,6 +193,18 @@ export interface OverviewResult {
     createdAt: string;
   }[];
   completedByDay: { date: string; count: number }[];
+  /** Dashboard extras (only on /overview). */
+  tasksOverdue: number;
+  createdDone: number;
+  hoursPerDay: { date: string; hours: number }[];
+  previous: {
+    label: string;
+    tasksCreated: number;
+    tasksCompleted: number;
+    hoursLogged: number;
+    tasksOpen: number;
+    tasksOverdue: number;
+  };
 }
 
 export interface ReportTaskSummary {

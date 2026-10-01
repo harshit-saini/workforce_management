@@ -3,7 +3,7 @@ import { AppError } from "../../lib/errors.js";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, addDays } from "../../lib/dates.js";
 
 export const overviewQuerySchema = z.object({
-  preset: z.enum(["this_week", "last_week", "last_2_weeks", "custom"]).optional(),
+  preset: z.enum(["last_7_days", "this_week", "last_week", "last_2_weeks", "custom"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   centerId: z.string().optional(),
@@ -17,6 +17,9 @@ export function parseRangeQuery(query: Record<string, string | undefined>): { st
   const preset = query.preset;
   const now = new Date();
 
+  if (preset === "last_7_days") {
+    return { startDate: startOfDay(addDays(now, -6)), endDate: endOfDay(now) };
+  }
   if (preset === "this_week" || !preset && !query.startDate && !query.endDate) {
     return { startDate: startOfWeek(now), endDate: endOfWeek(now) };
   }

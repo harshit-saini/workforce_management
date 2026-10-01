@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { card } from "@/lib/ui";
@@ -12,7 +13,7 @@ export default function StatCard({
 }: {
   label: string;
   value: string | number;
-  sub?: string;
+  sub?: ReactNode;
   accent?: string;
   /** When set, the whole tile links to the matching list (e.g. Blocked → the blocked tasks). */
   to?: string;

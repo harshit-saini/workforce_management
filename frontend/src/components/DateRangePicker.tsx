@@ -1,7 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 
-export type RangePreset = "this_week" | "last_week" | "last_2_weeks" | "custom";
+export type RangePreset = "last_7_days" | "this_week" | "last_week" | "last_2_weeks" | "custom";
 
 export interface RangeValue {
   preset: RangePreset;
@@ -10,6 +10,7 @@ export interface RangeValue {
 }
 
 const presets: { value: RangePreset; label: string }[] = [
+  { value: "last_7_days", label: "Last 7 days" },
   { value: "this_week", label: "This week" },
   { value: "last_week", label: "Last week" },
   { value: "last_2_weeks", label: "Last 2 weeks" },

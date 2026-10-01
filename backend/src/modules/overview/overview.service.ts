@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "@prisma/client";
-import { dateKey } from "../../lib/dates.js";
+import { addDays, dateKey, startOfDay } from "../../lib/dates.js";
 import { getStatusKeysByCategory } from "../../lib/taskStatuses.js";
 
 export interface OverviewScope {
@@ -167,5 +167,90 @@ export async function getOverview(
     completedByDay: Array.from(completedByDayMap.entries())
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([date, count]) => ({ date, count })),
+  };
+}
+
+export interface OverviewExtras {
+  /** Not finished and due before today — the same rule as the Tasks page's Overdue chip. */
+  tasksOverdue: number;
+  /** Of the tasks created in the range, how many are done now. */
+  createdDone: number;
+  /** Every day of the range, days with no hours included. */
+  hoursPerDay: { date: string; hours: number }[];
+  /** The same measures for the period of equal length just before, and how many tasks were open / overdue at its end. */
+  previous: {
+    label: string;
+    tasksCreated: number;
+    tasksCompleted: number;
+    hoursLogged: number;
+    tasksOpen: number;
+    tasksOverdue: number;
+  };
+}
+
+/** The extra numbers the dashboard needs: overdue, a per-day hours series, and last period for comparison. */
+export async function getOverviewExtras(
+  organizationId: string,
+  scope: OverviewScope,
+  startDate: Date,
+  endDate: Date,
+  hoursByDay: { date: string; hours: number }[]
+): Promise<OverviewExtras> {
+  const where = baseTaskWhere(organizationId, scope);
+  const doneKeys = await getStatusKeysByCategory(organizationId, ["DONE"]);
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / dayMs));
+  const prevStart = addDays(startDate, -days);
+  const prevEnd = new Date(startDate.getTime() - 1);
+  const todayStart = startOfDay(new Date());
+
+  const logWhere = (from: Date, to: Date): Prisma.TaskLogWhereInput => ({
+    date: { gte: from, lte: to },
+    ...(scope.userIds ? { userId: { in: scope.userIds } } : {}),
+    task: {
+      organizationId,
+      ...(scope.centerId ? { centerId: scope.centerId } : {}),
+      ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
+    },
+  });
+  // A task counted as open at the end of the previous period if it existed then and wasn't finished by then.
+  const openThen: Prisma.TaskWhereInput = {
+    ...where,
+    createdAt: { lte: prevEnd },
+    OR: [{ status: { notIn: doneKeys } }, { completedAt: { gt: prevEnd } }],
+  };
+
+  const [tasksOverdue, createdDone, prevCreated, prevCompleted, prevHours, prevOpen, prevOverdue] = await Promise.all([
+    prisma.task.count({ where: { ...where, status: { notIn: doneKeys }, dueDate: { lt: todayStart } } }),
+    prisma.task.count({ where: { ...where, createdAt: { gte: startDate, lte: endDate }, status: { in: doneKeys } } }),
+    prisma.task.count({ where: { ...where, createdAt: { gte: prevStart, lte: prevEnd } } }),
+    prisma.task.count({ where: { ...where, status: { in: doneKeys }, completedAt: { gte: prevStart, lte: prevEnd } } }),
+    prisma.taskLog.aggregate({ where: logWhere(prevStart, prevEnd), _sum: { hoursLogged: true } }),
+    prisma.task.count({ where: openThen }),
+    prisma.task.count({ where: { ...openThen, dueDate: { lt: startOfDay(prevEnd) } } }),
+  ]);
+
+  // Walk the range by UTC calendar day, the same way log dates are keyed.
+  const byDay = new Map(hoursByDay.map((d) => [d.date, d.hours]));
+  const hoursPerDay: { date: string; hours: number }[] = [];
+  const last = dateKey(endDate);
+  for (let cursor = new Date(`${dateKey(startDate)}T00:00:00Z`); dateKey(cursor) <= last; cursor = new Date(cursor.getTime() + dayMs)) {
+    const key = dateKey(cursor);
+    hoursPerDay.push({ date: key, hours: byDay.get(key) ?? 0 });
+  }
+
+  return {
+    tasksOverdue,
+    createdDone,
+    hoursPerDay,
+    previous: {
+      label: days === 7 ? "last week" : `the previous ${days} ${days === 1 ? "day" : "days"}`,
+      tasksCreated: prevCreated,
+      tasksCompleted: prevCompleted,
+      hoursLogged: prevHours._sum.hoursLogged ?? 0,
+      tasksOpen: prevOpen,
+      tasksOverdue: prevOverdue,
+    },
   };
 }

@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { CHART_COLORS } from "@/lib/chartColors";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format, formatDistanceToNow } from "date-fns";
 import PeriodStepper from "@/components/PeriodStepper";
@@ -113,7 +114,7 @@ export default function MonthlyReportPage() {
                 <XAxis dataKey="weekStartDate" tickFormatter={(d) => format(new Date(d), "MMM d")} fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip labelFormatter={(d) => format(new Date(d), "MMM d, yyyy")} />
-                <Line type="monotone" dataKey="tasksCompleted" stroke="#3182f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="tasksCompleted" stroke={CHART_COLORS.primary} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
