@@ -5,6 +5,7 @@ import { sendEmail } from "../../lib/email.js";
 import { config } from "../../lib/config.js";
 import { AuthUser } from "../../plugins/auth.js";
 import { paginationMeta, toSkipTake } from "../../lib/pagination.js";
+import { getDownlineUserIds } from "../../lib/hierarchy.js";
 import { z } from "zod";
 import {
   listUsersQuerySchema,
@@ -197,6 +198,8 @@ export async function adminUpdateUser(
 }
 
 export async function updateRole(organizationId: string, actor: AuthUser, targetUserId: string, role: Role) {
+  // An admin demoting themselves could lock the organization out of its own admin pages.
+  if (targetUserId === actor.id) throw AppError.forbidden("You can't change your own role");
   const target = await prisma.user.findFirst({ where: { id: targetUserId, organizationId } });
   if (!target) throw AppError.notFound("User not found");
   if (target.role === "OWNER") throw AppError.forbidden("The organization owner's role cannot be changed");
@@ -225,6 +228,7 @@ export async function updateStatus(
   targetUserId: string,
   status: "ACTIVE" | "INACTIVE" | "ON_LEAVE"
 ) {
+  if (targetUserId === actor.id) throw AppError.forbidden("You can't change your own status");
   const target = await prisma.user.findFirst({ where: { id: targetUserId, organizationId } });
   if (!target) throw AppError.notFound("User not found");
   if (target.role === "OWNER") throw AppError.forbidden("The organization owner cannot be deactivated");
@@ -246,12 +250,52 @@ export async function updateStatus(
   return updated;
 }
 
-export async function removeUser(organizationId: string, actor: AuthUser, targetUserId: string) {
+export async function removeUser(
+  organizationId: string,
+  actor: AuthUser,
+  targetUserId: string,
+  reassignReportsTo?: string
+) {
+  if (targetUserId === actor.id) throw AppError.forbidden("You can't remove your own account");
   const target = await prisma.user.findFirst({ where: { id: targetUserId, organizationId } });
   if (!target) throw AppError.notFound("User not found");
   if (target.role === "OWNER") throw AppError.forbidden("The organization owner cannot be removed");
 
+  // Their direct reports need a new manager (or none). Anyone from the removed person's own
+  // downline is off the table: it would make someone their own manager, directly or further up.
+  if (reassignReportsTo) {
+    if (reassignReportsTo === targetUserId) throw AppError.badRequest("Choose someone else to take over their reports");
+    const newManager = await prisma.user.findFirst({
+      where: { id: reassignReportsTo, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!newManager) throw AppError.badRequest("The new manager must be an active member of your organization");
+    const downline = await getDownlineUserIds(organizationId, targetUserId);
+    if (downline.includes(reassignReportsTo)) {
+      throw AppError.badRequest("The new manager can't be one of the removed person's own reports");
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
+    const directReports = await tx.user.findMany({
+      where: { organizationId, managerId: targetUserId, deletedAt: null },
+      select: { id: true },
+    });
+    if (directReports.length > 0) {
+      await tx.user.updateMany({
+        where: { id: { in: directReports.map((r) => r.id) } },
+        data: { managerId: reassignReportsTo ?? null },
+      });
+      await tx.auditLog.createMany({
+        data: directReports.map((r) => ({
+          organizationId,
+          action: "MANAGER_REASSIGNED" as const,
+          actorId: actor.id,
+          targetUserId: r.id,
+          metadata: { from: targetUserId, to: reassignReportsTo ?? null, reason: "manager removed" },
+        })),
+      });
+    }
     await tx.user.update({
       where: { id: targetUserId },
       data: { deletedAt: new Date(), status: "INACTIVE" },

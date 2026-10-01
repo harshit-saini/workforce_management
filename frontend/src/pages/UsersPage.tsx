@@ -4,10 +4,13 @@ import { formatDistanceToNow } from "date-fns";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { toast } from "@/lib/toast";
-import { Invite, Role } from "@/types";
+import { Invite, Role, User } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { useUsersList, useCenters, useDepartments } from "@/hooks/useLookups";
 import FormField, { inputClass } from "@/components/FormField";
 import Avatar from "@/components/Avatar";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import ActionMenu from "@/components/ActionMenu";
 import QueryError, { LoadingText } from "@/components/QueryError";
 import { IconPlus } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
@@ -18,8 +21,41 @@ const roleLabel: Record<Role, string> = { OWNER: "Owner", ADMIN: "Admin", MANAGE
 const statusLabel: Record<string, string> = { ACTIVE: "Active", INACTIVE: "Inactive", ON_LEAVE: "On leave" };
 const fieldLabel: Record<string, string> = { centerId: "center", departmentId: "department", managerId: "manager" };
 
+/** What each role can do, shown when confirming a change so nobody grants access by accident. */
+const roleSummary: Record<Role, string> = {
+  OWNER: "",
+  ADMIN: "Admins can manage users, centers, departments and settings, and see everyone's tasks and reports.",
+  MANAGER: "Managers can see and review the tasks and reports of the people who report to them.",
+  EMPLOYEE: "Employees only see tasks they're assigned to, created or watch, and their own reports.",
+};
+const withArticle = (label: string) => `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
+
+/** Everyone below `userId` in the reporting tree (who can't take over their manager's reports). */
+function downlineOf(users: User[], userId: string): Set<string> {
+  const out = new Set<string>();
+  const queue = [userId];
+  while (queue.length) {
+    const current = queue.pop()!;
+    for (const u of users) {
+      if (u.managerId === current && !out.has(u.id)) {
+        out.add(u.id);
+        queue.push(u.id);
+      }
+    }
+  }
+  return out;
+}
+
+type Pending =
+  | { kind: "role"; user: User; role: Role }
+  | { kind: "status"; user: User; status: string }
+  | { kind: "remove"; user: User }
+  | { kind: "revoke"; invite: Invite };
+
 export default function UsersPage() {
   const [showInvite, setShowInvite] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const { user: me } = useAuth();
   const usersQuery = useUsersList();
   const { data } = usersQuery;
   const { data: centers } = useCenters();
@@ -47,8 +83,8 @@ export default function UsersPage() {
     mutationFn: (id: string) => api.delete(`/users/invites/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invites"] }),
     meta: {
-      successMessage: (_: unknown, id: string) => `Invite to ${inviteEmail(id)} cancelled`,
-      errorTitle: "Couldn't cancel the invite",
+      successMessage: (_: unknown, id: string) => `Invite to ${inviteEmail(id)} revoked`,
+      errorTitle: "Couldn't revoke the invite",
     },
   });
 
@@ -83,11 +119,15 @@ export default function UsersPage() {
   });
 
   const removeUser = useMutation({
-    mutationFn: (id: string) => api.delete(`/users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    mutationFn: ({ id, reassignReportsTo }: { id: string; reassignReportsTo?: string }) =>
+      api.delete(`/users/${id}`, { params: { reassignReportsTo } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["hierarchy-tree"] });
+    },
     meta: {
-      successMessage: (_: unknown, id: string) => `${userName(id)} removed`,
-      errorTitle: (id: string) => `Couldn't remove ${userName(id)}`,
+      successMessage: (_: unknown, v: { id: string }) => `${userName(v.id)} removed`,
+      errorTitle: (v: { id: string }) => `Couldn't remove ${userName(v.id)}`,
     },
   });
 
@@ -139,10 +179,14 @@ export default function UsersPage() {
                   <td className="px-4 py-2">
                     {u.role === "OWNER" ? (
                       "OWNER"
+                    ) : u.id === me?.id ? (
+                      <span title="You can't change your own role" className="cursor-not-allowed text-gray-500">
+                        {u.role}
+                      </span>
                     ) : (
                       <select
                         value={u.role}
-                        onChange={(e) => updateRole.mutate({ id: u.id, role: e.target.value as Role })}
+                        onChange={(e) => setPending({ kind: "role", user: u, role: e.target.value as Role })}
                         className="border border-gray-300 rounded px-1 py-0.5 text-xs"
                       >
                         {roles.map((r) => (
@@ -200,10 +244,19 @@ export default function UsersPage() {
                   <td className="px-4 py-2">
                     {u.role === "OWNER" ? (
                       "ACTIVE"
+                    ) : u.id === me?.id ? (
+                      <span title="You can't change your own status" className="cursor-not-allowed text-gray-500">
+                        {statusLabel[u.status ?? "ACTIVE"]}
+                      </span>
                     ) : (
                       <select
                         value={u.status}
-                        onChange={(e) => updateStatus.mutate({ id: u.id, status: e.target.value })}
+                        onChange={(e) => {
+                          const status = e.target.value;
+                          // Reactivating is harmless; anything else stops them signing in, so confirm it.
+                          if (status === "ACTIVE") updateStatus.mutate({ id: u.id, status });
+                          else setPending({ kind: "status", user: u, status });
+                        }}
                         className="border border-gray-300 rounded px-1 py-0.5 text-xs"
                       >
                         <option value="ACTIVE">Active</option>
@@ -214,14 +267,18 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-2">
                     {u.role !== "OWNER" && (
-                      <button
-                        onClick={() => {
-                          if (confirm(`Remove ${u.name}?`)) removeUser.mutate(u.id);
-                        }}
-                        className="text-red-600 text-xs hover:underline"
-                      >
-                        Remove
-                      </button>
+                      <ActionMenu
+                        label={`Actions for ${u.name}`}
+                        items={[
+                          {
+                            label: "Remove user…",
+                            danger: true,
+                            disabled: u.id === me?.id,
+                            title: u.id === me?.id ? "You can't remove your own account" : undefined,
+                            onSelect: () => setPending({ kind: "remove", user: u }),
+                          },
+                        ]}
+                      />
                     )}
                   </td>
                 </tr>
@@ -261,12 +318,10 @@ export default function UsersPage() {
                       Resend
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`Cancel the invite to ${invite.email}?`)) cancelInvite.mutate(invite.id);
-                      }}
+                      onClick={() => setPending({ kind: "revoke", invite })}
                       className="text-xs text-red-600 hover:underline"
                     >
-                      Cancel
+                      Revoke
                     </button>
                   </div>
                 </div>
@@ -274,6 +329,71 @@ export default function UsersPage() {
             })}
           </div>
         </div>
+      )}
+
+      {pending?.kind === "role" && (
+        <ConfirmDialog
+          title={`Make ${pending.user.name} ${withArticle(roleLabel[pending.role])}?`}
+          description={
+            <>
+              <p>{roleSummary[pending.role]}</p>
+              {pending.user.role === "ADMIN" && pending.role !== "ADMIN" && (
+                <p className="mt-2">They'll lose access to the admin pages.</p>
+              )}
+            </>
+          }
+          confirmLabel={`Make ${roleLabel[pending.role]}`}
+          onCancel={() => setPending(null)}
+          onConfirm={async () => {
+            await updateRole.mutateAsync({ id: pending.user.id, role: pending.role }).catch(() => {});
+            setPending(null);
+          }}
+        />
+      )}
+
+      {pending?.kind === "status" && (
+        <ConfirmDialog
+          title={`Mark ${pending.user.name} as ${statusLabel[pending.status] ?? pending.status}?`}
+          description={
+            <p>
+              {statusLabel[pending.status] ?? pending.status} users can't sign in. Anyone already signed in is signed out
+              within minutes. You can set them back to Active at any time.
+            </p>
+          }
+          confirmLabel={`Mark ${statusLabel[pending.status] ?? pending.status}`}
+          tone="danger"
+          onCancel={() => setPending(null)}
+          onConfirm={async () => {
+            await updateStatus.mutateAsync({ id: pending.user.id, status: pending.status }).catch(() => {});
+            setPending(null);
+          }}
+        />
+      )}
+
+      {pending?.kind === "revoke" && (
+        <ConfirmDialog
+          title={`Revoke the invite to ${pending.invite.email}?`}
+          description={<p>The link they were sent will stop working. You can invite them again later.</p>}
+          confirmLabel="Revoke invite"
+          tone="danger"
+          onCancel={() => setPending(null)}
+          onConfirm={async () => {
+            await cancelInvite.mutateAsync(pending.invite.id).catch(() => {});
+            setPending(null);
+          }}
+        />
+      )}
+
+      {pending?.kind === "remove" && data && (
+        <RemoveUserDialog
+          user={pending.user}
+          users={data.items}
+          onCancel={() => setPending(null)}
+          onConfirm={async (reassignReportsTo) => {
+            await removeUser.mutateAsync({ id: pending.user.id, reassignReportsTo }).catch(() => {});
+            setPending(null);
+          }}
+        />
       )}
 
       {showInvite && (
@@ -366,5 +486,61 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         </form>
       </div>
     </div>
+  );
+}
+
+function RemoveUserDialog({
+  user,
+  users,
+  onCancel,
+  onConfirm,
+}: {
+  user: User;
+  users: User[];
+  onCancel: () => void;
+  onConfirm: (reassignReportsTo: string | undefined) => Promise<void>;
+}) {
+  const directReports = users.filter((u) => u.managerId === user.id);
+  const unavailable = downlineOf(users, user.id);
+  const candidates = users.filter((u) => u.id !== user.id && !unavailable.has(u.id) && u.status !== "INACTIVE");
+  // Sensible default: their own manager takes over, if there is one and they can.
+  const [newManagerId, setNewManagerId] = useState(
+    user.managerId && candidates.some((c) => c.id === user.managerId) ? user.managerId : ""
+  );
+
+  return (
+    <ConfirmDialog
+      title={`Remove ${user.name}?`}
+      description={
+        <p>
+          They'll no longer be able to sign in or appear in lists. Their tasks, comments and history stay as they are.
+        </p>
+      }
+      confirmLabel="Remove user"
+      tone="danger"
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(newManagerId || undefined)}
+    >
+      {directReports.length > 0 && (
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            {directReports.length === 1 ? "1 person reports" : `${directReports.length} people report`} to {user.name}.
+            Who should they report to now?
+          </span>
+          <select
+            value={newManagerId}
+            onChange={(e) => setNewManagerId(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+          >
+            <option value="">No one (top level of the org chart)</option>
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </ConfirmDialog>
   );
 }

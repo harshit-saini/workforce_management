@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useCenters } from "@/hooks/useLookups";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import QueryError, { LoadingText } from "@/components/QueryError";
 
 interface TeamRow {
@@ -22,6 +23,8 @@ const statusColor: Record<string, string> = {
 
 export default function WeeklyTeamReportPage() {
   const [centerId, setCenterId] = useState("");
+  /** The report being sent back; its dialog collects the (required) reason. */
+  const [requestingChangesFor, setRequestingChangesFor] = useState<{ id: string; name: string } | null>(null);
   const { data: centers } = useCenters();
   const queryClient = useQueryClient();
 
@@ -104,11 +107,7 @@ export default function WeeklyTeamReportPage() {
                     Approve
                   </button>
                   <button
-                    onClick={() => {
-                      const comment = prompt("What changes are needed?");
-                      if (comment === null) return; // cancelled
-                      review.mutate({ id: row.report!.id, name: row.user.name, status: "CHANGES_REQUESTED", managerComment: comment });
-                    }}
+                    onClick={() => setRequestingChangesFor({ id: row.report!.id, name: row.user.name })}
                     className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
                   >
                     Request changes
@@ -120,6 +119,22 @@ export default function WeeklyTeamReportPage() {
         ))}
         {data?.length === 0 && <div className="px-4 py-6 text-sm text-gray-400 text-center">No team members found</div>}
       </div>
+
+      {requestingChangesFor && (
+        <ConfirmDialog
+          title={`Send ${requestingChangesFor.name}'s report back?`}
+          description={<p>They'll be notified and can edit and resubmit it. Tell them what needs to change.</p>}
+          textInput={{ label: "What changes are needed?", placeholder: "e.g. Add what blocked the Q4 launch work" }}
+          confirmLabel="Send back"
+          onCancel={() => setRequestingChangesFor(null)}
+          onConfirm={async (comment) => {
+            await review
+              .mutateAsync({ id: requestingChangesFor.id, name: requestingChangesFor.name, status: "CHANGES_REQUESTED", managerComment: comment })
+              .catch(() => {});
+            setRequestingChangesFor(null);
+          }}
+        />
+      )}
     </div>
   );
 }

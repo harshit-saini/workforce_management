@@ -272,3 +272,13 @@ export function IconLink(props: IconProps) {
     </svg>
   );
 }
+
+export function IconMoreHorizontal(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="5.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="18.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

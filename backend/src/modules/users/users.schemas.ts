@@ -40,6 +40,11 @@ export const updateRoleSchema = z.object({
   role: z.nativeEnum(Role),
 });
 
+export const removeUserQuerySchema = z.object({
+  // Who the removed person's direct reports move under. Omit to move them to the top level.
+  reassignReportsTo: z.string().min(1).optional(),
+});
+
 export const updateStatusSchema = z.object({
   status: z.nativeEnum(UserStatus),
 });

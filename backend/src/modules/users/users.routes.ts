@@ -7,6 +7,7 @@ import {
   adminUpdateUserSchema,
   updateRoleSchema,
   updateStatusSchema,
+  removeUserQuerySchema,
 } from "./users.schemas.js";
 
 export default async function usersRoutes(fastify: FastifyInstance) {
@@ -99,7 +100,8 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     { preHandler: fastify.requireRole("OWNER", "ADMIN") },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      await usersService.removeUser(request.authUser.organizationId, request.authUser, id);
+      const { reassignReportsTo } = removeUserQuerySchema.parse(request.query);
+      await usersService.removeUser(request.authUser.organizationId, request.authUser, id, reassignReportsTo);
       return reply.code(204).send();
     }
   );

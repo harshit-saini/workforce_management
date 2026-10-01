@@ -9,6 +9,7 @@ import FormField, { inputClass } from "@/components/FormField";
 import { IconPlus, IconChevronUp, IconChevronDown } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/lib/ui";
 import QueryError, { LoadingText } from "@/components/QueryError";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const categoryLabel: Record<StatusCategory, string> = {
   BACKLOG: "Backlog",
@@ -22,6 +23,7 @@ export default function SettingsPage() {
   const statusesQuery = useTaskStatuses();
   const statuses = statusesQuery.data;
   const [showAdd, setShowAdd] = useState(false);
+  const [deleting, setDeleting] = useState<TaskStatusOption | null>(null);
 
   const { data: org } = useQuery({
     queryKey: ["organization"],
@@ -202,18 +204,50 @@ export default function SettingsPage() {
                 onChange={() => updateStatus.mutate({ id: s.id, data: { isRecurringDefault: true } })}
                 title="Used for ongoing/recurring tasks"
               />
-              <button
-                onClick={() => {
-                  if (confirm(`Delete status "${s.label}"?`)) deleteStatus.mutate(s.id);
-                }}
-                className="text-xs text-red-600 hover:underline justify-self-end shrink-0"
-              >
-                Delete
-              </button>
+              {s.isDefault || s.isRecurringDefault ? (
+                // Wrapped in a span because disabled buttons don't show tooltips.
+                <span
+                  className="justify-self-end shrink-0"
+                  title={
+                    s.isDefault
+                      ? "New tasks start here. Make another status the default before deleting this one."
+                      : "Used for ongoing tasks. Make another status the ongoing default before deleting this one."
+                  }
+                >
+                  <button disabled className="text-xs text-red-600 opacity-40 cursor-not-allowed">
+                    Delete
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setDeleting(s)}
+                  className="text-xs text-red-600 hover:underline justify-self-end shrink-0"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           ))}
         </div>
       </section>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete the "${deleting.label}" status?`}
+          description={
+            <p>
+              This can't be undone. If any tasks still use it, it won't be deleted. Move them to another status first.
+            </p>
+          }
+          confirmLabel="Delete status"
+          tone="danger"
+          onCancel={() => setDeleting(null)}
+          onConfirm={async () => {
+            await deleteStatus.mutateAsync(deleting.id).catch(() => {});
+            setDeleting(null);
+          }}
+        />
+      )}
 
       {showAdd && <AddStatusModal onClose={() => setShowAdd(false)} onCreated={invalidateStatuses} />}
     </div>
