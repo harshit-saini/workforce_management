@@ -118,6 +118,8 @@ export interface Task {
   subtasks?: { id: string; title: string; status: TaskStatus; assigneeId: string | null; dueDate: string | null }[];
   dueDate: string | null;
   estimatedHours: number | null;
+  /** Total hours logged by everyone; only on the single-task response. */
+  loggedHours?: number;
   blockedReason: string | null;
   tags: TaskTag[];
   watchers?: { userId: string; user: { id: string; name: string } }[];

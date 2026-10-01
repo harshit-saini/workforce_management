@@ -25,7 +25,7 @@ export default async function tasksRoutes(fastify: FastifyInstance) {
   fastify.get("/tasks/:id", async (request) => {
     const { id } = request.params as { id: string };
     const accessible = await resolveAccessibleUserIds(request.authUser);
-    return tasksService.getTaskOrThrow(request.authUser.organizationId, accessible, id);
+    return tasksService.getTaskDetail(request.authUser.organizationId, accessible, id);
   });
 
   fastify.post("/tasks", async (request, reply) => {

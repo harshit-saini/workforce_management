@@ -93,6 +93,13 @@ export default function TasksPage() {
     setParams(next, { state: { drawer: true } });
   }
 
+  /** Moving between tasks inside the open panel swaps the entry, so one Close or Back still shuts the panel. */
+  function switchTask(id: string) {
+    const next = new URLSearchParams(params);
+    next.set("task", id);
+    setParams(next, { replace: true, state: location.state });
+  }
+
   function closeTask() {
     if ((location.state as { drawer?: boolean } | null)?.drawer) navigate(-1);
     else updateParams({ task: null });
@@ -388,7 +395,7 @@ export default function TasksPage() {
           onOpenCreated={openTask}
           defaultRecurring={tab === "ongoing"}
         />}
-      {openTaskId && <TaskDetailDrawer key={openTaskId} taskId={openTaskId} onClose={closeTask} />}
+      {openTaskId && <TaskDetailDrawer key={openTaskId} taskId={openTaskId} onClose={closeTask} onOpenTask={switchTask} />}
     </div>
   );
 }
