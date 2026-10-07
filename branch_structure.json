@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "claude/hello-u7j2u6",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "claude/hello-u7j2u6": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "claude/hello-u7j2u6",
+    "origin"
+  ]
+}
