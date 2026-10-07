@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { emailSchema } from "../../lib/emailAddress.js";
 import { Role, UserStatus } from "@prisma/client";
 
 export const listUsersQuerySchema = z.object({
@@ -12,7 +13,7 @@ export const listUsersQuerySchema = z.object({
 });
 
 export const inviteUserSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   role: z.nativeEnum(Role).default("EMPLOYEE"),
   centerId: z.string().optional(),
   departmentId: z.string().optional(),
