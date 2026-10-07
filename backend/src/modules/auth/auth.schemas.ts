@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { emailSchema } from "../../lib/emailAddress.js";
 
 export const signupSchema = z.object({
   organizationName: z.string().min(2).max(120),
   name: z.string().min(1).max(120),
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(8).max(128),
   // The browser's IANA timezone (e.g. "Asia/Kolkata"), used for the first center. Ignored if not a real zone.
   timezone: z
@@ -22,7 +23,7 @@ export const signupSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(1),
 });
 
@@ -36,7 +37,7 @@ export const acceptInviteSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
 });
 
 export const resetPasswordSchema = z.object({
