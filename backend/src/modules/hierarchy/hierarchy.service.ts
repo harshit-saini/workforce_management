@@ -3,6 +3,7 @@ import { AppError } from "../../lib/errors.js";
 import { getDownlineUserIds, getReportingChainUp } from "../../lib/hierarchy.js";
 import * as usersService from "../users/users.service.js";
 import { AuthUser } from "../../plugins/auth.js";
+import { normalizeEmail } from "../../lib/emailAddress.js";
 
 const nodeSelect = {
   id: true,
@@ -91,9 +92,11 @@ function parseCsv(csv: string): CsvRow[] {
     const cells = line.split(",").map((c) => c.trim());
     const row: Record<string, string> = {};
     header.forEach((h, i) => (row[h] = cells[i] ?? ""));
+    const managerEmail = row["manager's email"] || row["manageremail"] || row.manager;
     rows.push({
-      email: row.email,
-      managerEmail: row["manager's email"] || row["manageremail"] || row.manager,
+      // Emails are stored lower-case, so the sheet's "Tarun.Kumar@…" must match "tarun.kumar@…".
+      email: row.email ? normalizeEmail(row.email) : row.email,
+      managerEmail: managerEmail ? normalizeEmail(managerEmail) : managerEmail,
       department: row.department,
       title: row.title,
       center: row.center,
